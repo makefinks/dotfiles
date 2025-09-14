@@ -8,12 +8,9 @@ window-height = 30
 background-opacity = 0.7
 background-blur = true
 
-# Padding
-# window-padding-x = 0
-# window-padding-y = 20
-#
-# Shell
 command = "/bin/zsh -l"
 
-custom-shader = shaders/cursor_smear.glsl
+# custom-shader = smear.glsl
 custom-shader = shaders/blaze.glsl
+custom-shader = shaders/cursor_smear.glsl
+
