@@ -1,0 +1,23 @@
+background = #000000
+foreground = #FFFFFF
+
+# Font
+font-size = 14.0
+
+# Window size in terminal cells
+window-width = 90
+window-height = 30
+
+# Transparency and blur
+background-opacity = 0.7
+background-blur = true
+
+# Titlebar style (macOS)
+macos-titlebar-style = transparent
+
+# remove extra padding from bottom
+window-padding-balance = true
+
+custom-shader = shaders/blaze.glsl
+custom-shader = shaders/cursor_warp.glsl
+custom-shader = shaders/ripple_rectangle_cursor.glsl
