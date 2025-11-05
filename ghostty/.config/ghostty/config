@@ -18,6 +18,9 @@ macos-titlebar-style = transparent
 # remove extra padding from bottom
 window-padding-balance = true
 
+# Enable kitty graphics protocol for image rendering
+image-storage-limit = 500000000
+
 custom-shader = shaders/blaze.glsl
 custom-shader = shaders/cursor_warp.glsl
 custom-shader = shaders/ripple_rectangle_cursor.glsl
