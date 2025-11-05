@@ -57,7 +57,7 @@ vim.api.nvim_create_autocmd("VimEnter", {
 
 pcall(require, "local")
 
-vim.keymap.set("n", "<C-d>", "10jzz", { noremap = true })
-vim.keymap.set("n", "<C-u>", "10kzz", { noremap = true })
-vim.keymap.set("v", "<C-d>", "10jzz", { noremap = true })
-vim.keymap.set("v", "<C-u>", "10kzz", { noremap = true })
+vim.keymap.set("n", "<C-d>", "10j", { noremap = true })
+vim.keymap.set("n", "<C-u>", "10k", { noremap = true })
+vim.keymap.set("v", "<C-d>", "10j", { noremap = true })
+vim.keymap.set("v", "<C-u>", "10k", { noremap = true })

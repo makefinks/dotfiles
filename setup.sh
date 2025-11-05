@@ -12,7 +12,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
   fi
 
   echo "Installing dependencies via Homebrew..."
-  brew install stow neovim tmux node python rust fd ripgrep fzf wget imagemagick luarocks
+  brew install stow neovim tmux node python rust fd ripgrep fzf wget imagemagick luarocks viu
 
   echo "Installing neovim language clients..."
   npm install -g neovim
@@ -43,7 +43,7 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
 
     echo "Installing neovim language clients..."
     npm install -g neovim
-    pip install pynvim
+    pip install pynvim viu
   else
     echo "Unsupported package manager. Please install dependencies manually"
     exit 1
