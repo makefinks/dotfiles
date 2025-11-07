@@ -1,6 +1,6 @@
 return {
   "folke/sidekick.nvim",
-  enabled = require("toggles").enabled "sidekick",
+  enabled = require("toggles").enabled("sidekick"),
   opts = {
     -- add any options here
     cli = {
