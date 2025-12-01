@@ -1,51 +1,56 @@
 ---@type Flash.Config
 local flash_opts = {
-  search = {
-    exclude = {
-      "neo-tree",
-      "neo-tree-popup",
-      "TelescopePrompt",
-    },
-  },
+	search = {
+		exclude = {
+			"neo-tree",
+			"neo-tree-popup",
+			"TelescopePrompt",
+		},
+	},
+	modes = {
+		char = {
+			enabled = false, -- disable f/t/F/T enhancement
+		},
+	},
 }
 
 return {
-  "folke/flash.nvim",
-  event = "VeryLazy",
-  opts = flash_opts,
-  config = function(_, opts)
-    require("flash").setup(opts)
+	"folke/flash.nvim",
+	event = "VeryLazy",
+	opts = flash_opts,
+	config = function(_, opts)
+		require("flash").setup(opts)
 
-    local colors = require("tokyonight.colors").setup()
+		local colors = require("tokyonight.colors").setup()
 
-    vim.api.nvim_set_hl(0, "FlashLabel", {
-      bg = colors.magenta,
-      fg = colors.black,
-      bold = true,
-    })
+		vim.api.nvim_set_hl(0, "FlashLabel", {
+			bg = colors.magenta,
+			fg = colors.black,
+			bold = true,
+		})
 
-    vim.api.nvim_set_hl(0, "FlashLabelCurrent", {
-      bg = colors.orange,
-      fg = colors.black,
-      bold = true,
-    })
+		vim.api.nvim_set_hl(0, "FlashLabelCurrent", {
+			bg = colors.orange,
+			fg = colors.black,
+			bold = true,
+		})
 
-    vim.api.nvim_set_hl(0, "FlashMatch", {
-      fg = colors.red,
-      underline = true,
-    })
+		vim.api.nvim_set_hl(0, "FlashMatch", {
+			fg = colors.red,
+			underline = true,
+		})
 
-    vim.api.nvim_set_hl(0, "FlashCurrent", {
-      bg = colors.bg_highlight,
-      fg = colors.yellow,
-      bold = true,
-    })
+		vim.api.nvim_set_hl(0, "FlashCurrent", {
+			bg = colors.bg_highlight,
+			fg = colors.yellow,
+			bold = true,
+		})
 
-    vim.api.nvim_set_hl(0, "FlashPromptIcon", {
-      fg = colors.red,
-      bold = true,
-    })
-  end,
+		vim.api.nvim_set_hl(0, "FlashPromptIcon", {
+			fg = colors.red,
+			bold = true,
+		})
+	end,
   -- stylua: ignore
   keys = {
     { "s", mode = { "n", "x", "o" }, function() require("flash").jump() end,        desc = "Flash jump" },
