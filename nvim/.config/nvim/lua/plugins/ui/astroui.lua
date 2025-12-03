@@ -8,7 +8,7 @@ return {
 	"AstroNvim/astroui",
 	---@type AstroUIOpts
 	opts = {
-		colorscheme = "tokyonight-night",
+		colorscheme = "cyberdream",
 		-- add new user interface icon
 		icons = {
 			VimIcon = "",
