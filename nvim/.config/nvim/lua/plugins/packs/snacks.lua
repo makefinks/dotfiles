@@ -1,7 +1,11 @@
 return {
 	"folke/snacks.nvim",
 	priority = 1000,
-
+	keys = {
+		-- Remap snacks git branch picker to <leader>gB (vgit uses <leader>gb)
+		{ "<Leader>gb", false },
+		{ "<Leader>gB", function() Snacks.picker.git_branches() end, desc = "Git branches" },
+	},
 	-- Lazy‑load on command or event if you like, e.g.:
 	-- cmd = "Snacks", event = "VeryLazy",
 	opts = function()
