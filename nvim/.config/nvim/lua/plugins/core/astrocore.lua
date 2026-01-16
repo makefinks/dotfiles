@@ -54,7 +54,17 @@ return {
 		-- NOTE: keycodes follow the casing in the vimdocs. For example, `<Leader>` must be capitalized
 		mappings = {
 			-- first key is the mode
-			n = {},
+			n = {
+				["<Leader>yp"] = {
+					function()
+						local path = vim.fn.expand("%:.")
+						vim.fn.setreg("+", path)
+						vim.fn.setreg('"', path)
+						Snacks.notifier.notify("Copied: " .. path, "info", { title = "Path" })
+					end,
+					desc = "Yank relative file path",
+				},
+			},
 		},
 	},
 }
