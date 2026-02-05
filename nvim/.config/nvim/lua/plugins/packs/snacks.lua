@@ -52,9 +52,7 @@ return {
 							icon = " ",
 							key = "ff",
 							desc = "Find File",
-							action = function()
-								require("fff").find_files()
-							end,
+							action = ":FFFFind",
 						},
 						{ icon = " ", key = "n", desc = "New File", action = ":ene | startinsert" },
 						{
