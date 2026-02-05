@@ -24,3 +24,15 @@ image-storage-limit = 500000000
 custom-shader = shaders/blaze.glsl
 custom-shader = shaders/cursor_warp.glsl
 custom-shader = shaders/ripple_rectangle_cursor.glsl
+
+# tmux-like leader tab switching (Ctrl+b, then index)
+keybind = ctrl+b>0=goto_tab:1
+keybind = ctrl+b>1=goto_tab:2
+keybind = ctrl+b>2=goto_tab:3
+keybind = ctrl+b>3=goto_tab:4
+keybind = ctrl+b>4=goto_tab:5
+keybind = ctrl+b>5=goto_tab:6
+keybind = ctrl+b>6=goto_tab:7
+keybind = ctrl+b>7=goto_tab:8
+keybind = ctrl+b>8=goto_tab:9
+keybind = ctrl+b>9=goto_tab:10
