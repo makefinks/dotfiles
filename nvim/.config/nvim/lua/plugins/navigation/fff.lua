@@ -1,6 +1,15 @@
 return {
 	"dmtrKovalenko/fff.nvim",
 	enabled = require("toggles").enabled("fff"),
+	cmd = {
+		"FFFFind",
+		"FFFScan",
+		"FFFRefreshGit",
+		"FFFClearCache",
+		"FFFHealth",
+		"FFFDebug",
+		"FFFOpenLog",
+	},
 	build = function()
 		-- this will download prebuild binary or try to use existing rustup toolchain to build from source
 		-- (if you are using lazy you can use gb for rebuilding a plugin if needed)
@@ -16,9 +25,7 @@ return {
 		prompt = "↯ ",
 		title = "FFF↯",
 	},
-	-- No need to lazy-load with lazy.nvim.
-	-- This plugin initializes itself lazily.
-	lazy = false,
+	lazy = true,
 	keys = {
 		{
 			"ff",

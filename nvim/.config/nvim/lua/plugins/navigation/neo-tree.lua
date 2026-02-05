@@ -11,6 +11,11 @@ return {
     filesystem = {
       commands = {
         find_files_in_dir = function()
+          local ok_lazy, lazy = pcall(require, "lazy")
+          if ok_lazy and lazy and lazy.load then
+            lazy.load { plugins = { "fff.nvim" } }
+          end
+
           local ok, fff = pcall(require, "fff")
           if ok and fff and fff.find_files then
             fff.find_files()
