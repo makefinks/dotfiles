@@ -272,8 +272,6 @@ local quotes = {
 
 local current_index = math.random(#quotes)
 
-local current_index = math.random(#quotes)
-
 function M.get_quote()
 	local index = math.random(#quotes)
 	return quotes[index]

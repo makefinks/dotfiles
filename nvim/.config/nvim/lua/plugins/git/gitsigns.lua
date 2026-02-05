@@ -6,7 +6,8 @@ return {
 			local original_on_attach = opts.on_attach
 			opts.on_attach = function(bufnr)
 				original_on_attach(bufnr)
-				vim.keymap.del("n", "<Leader>gd", { buffer = bufnr })
+				-- gitsigns key defaults can change across versions; avoid hard failures.
+				pcall(vim.keymap.del, "n", "<Leader>gd", { buffer = bufnr })
 			end
 		end
 	end,

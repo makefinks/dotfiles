@@ -1,8 +1,10 @@
 return {
 	"dnlhc/glance.nvim",
 	cmd = "Glance",
-	vim.keymap.set("n", "gR", "<CMD>Glance references<CR>"),
-	vim.keymap.set("n", "gT", "<CMD>Glance type_definitions<CR>"),
+	keys = {
+		{ "gR", "<CMD>Glance references<CR>", desc = "LSP references (Glance)" },
+		{ "gT", "<CMD>Glance type_definitions<CR>", desc = "LSP type definitions (Glance)" },
+	},
 	opts = {
 		border = {
 			enable = true,
