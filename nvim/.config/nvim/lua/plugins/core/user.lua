@@ -13,7 +13,7 @@ return {
     end,
   },
   {
-    "better-escape.nvim",
+    "max397574/better-escape.nvim",
     enabled = false,
   },
 }
