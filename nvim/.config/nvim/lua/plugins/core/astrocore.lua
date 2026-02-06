@@ -41,6 +41,8 @@ return {
 				relativenumber = true, -- sets vim.opt.relativenumber
 				number = true, -- sets vim.opt.number
 				hlsearch = true, -- keep search highlights enabled
+				ignorecase = true, -- case-insensitive search
+				smartcase = false, -- keep search fully case-insensitive
 				spell = false, -- sets vim.opt.spell
 				signcolumn = "yes", -- sets vim.opt.signcolumn to yes
 				wrap = false, -- sets vim.opt.wrap
@@ -76,6 +78,8 @@ return {
 					end,
 					desc = "Search word under cursor (no jump)",
 				},
+				n = { "nzzzv", desc = "Next search result (centered)" },
+				N = { "Nzzzv", desc = "Previous search result (centered)" },
 				["<Leader>yp"] = {
 					function()
 						local path = vim.fn.expand("%:.")
