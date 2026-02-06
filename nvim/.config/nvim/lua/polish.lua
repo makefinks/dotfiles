@@ -17,8 +17,20 @@ local function set_cursor_hl()
 	vim.api.nvim_set_hl(0, "TermCursorNC", { fg = "#000000", bg = "#444444" })
 end
 
+local function set_search_hl()
+	vim.api.nvim_set_hl(0, "Search", { fg = "#10131A", bg = "#FFD166", bold = true })
+	vim.api.nvim_set_hl(0, "CurSearch", { fg = "#10131A", bg = "#FF8C42", bold = true })
+	vim.api.nvim_set_hl(0, "IncSearch", { fg = "#10131A", bg = "#FF8C42", bold = true })
+end
+
 set_cursor_hl()
-vim.api.nvim_create_autocmd("ColorScheme", { callback = set_cursor_hl })
+set_search_hl()
+vim.api.nvim_create_autocmd("ColorScheme", {
+	callback = function()
+		set_cursor_hl()
+		set_search_hl()
+	end,
+})
 
 vim.api.nvim_create_autocmd({ "FocusGained", "BufEnter", "CursorHold", "CursorHoldI" }, {
 	command = "if mode() != 'c' | checktime | endif",

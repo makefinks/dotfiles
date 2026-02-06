@@ -40,6 +40,7 @@ return {
 			opt = { -- vim.opt.<key>
 				relativenumber = true, -- sets vim.opt.relativenumber
 				number = true, -- sets vim.opt.number
+				hlsearch = true, -- keep search highlights enabled
 				spell = false, -- sets vim.opt.spell
 				signcolumn = "yes", -- sets vim.opt.signcolumn to yes
 				wrap = false, -- sets vim.opt.wrap
@@ -50,11 +51,31 @@ return {
 				-- This can be found in the `lua/lazy_setup.lua` file
 			},
 		},
+		-- Disable AstroNvim's auto-toggle of hlsearch so matches stay highlighted
+		on_keys = {
+			auto_hlsearch = false,
+		},
 		-- Mappings can be configured through AstroCore as well.
 		-- NOTE: keycodes follow the casing in the vimdocs. For example, `<Leader>` must be capitalized
 		mappings = {
 			-- first key is the mode
 			n = {
+				["<Esc>"] = {
+					function()
+						if vim.v.hlsearch == 1 then vim.cmd.nohlsearch() end
+					end,
+					desc = "Clear search highlight",
+				},
+				F = {
+					function()
+						local word = vim.fn.expand "<cword>"
+						if word == nil or word == "" then return end
+						local pattern = "\\V\\<" .. vim.fn.escape(word, "\\") .. "\\>"
+						vim.fn.setreg("/", pattern)
+						vim.opt.hlsearch = true
+					end,
+					desc = "Search word under cursor (no jump)",
+				},
 				["<Leader>yp"] = {
 					function()
 						local path = vim.fn.expand("%:.")
