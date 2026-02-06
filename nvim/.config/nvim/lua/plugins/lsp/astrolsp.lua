@@ -17,7 +17,7 @@ return {
     formatting = {
       -- control auto formatting on save
       format_on_save = {
-        enabled = true, -- enable or disable format on save globally
+        enabled = false, -- conform.nvim handles format on save
         allow_filetypes = { -- enable format on save for specified filetypes only
           -- "go",
         },
