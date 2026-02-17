@@ -4,6 +4,7 @@ return {
 	keys = {
 		-- Remap snacks git branch picker to <leader>gB (vgit uses <leader>gb)
 		{ "<Leader>gb", false },
+		{ "<leader>fw", false },
 		{ "<Leader>gB", function() Snacks.picker.git_branches() end, desc = "Git branches" },
 	},
 	-- Lazy‑load on command or event if you like, e.g.:
@@ -59,7 +60,7 @@ return {
 							icon = " ",
 							key = "g",
 							desc = "Find Text",
-							action = ":lua Snacks.dashboard.pick('live_grep')",
+							action = ":lua require('fff').live_grep()",
 						},
 						{
 							icon = " ",

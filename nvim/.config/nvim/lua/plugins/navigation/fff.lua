@@ -41,5 +41,16 @@ return {
 			end,
 			desc = "FFF: find files",
 		},
+		{
+			"<leader>fw",
+			function()
+				require("fff").live_grep({
+					grep = {
+						modes = { "plain", "fuzzy" },
+					},
+				})
+			end,
+			desc = "Live fffuzy grep",
+		},
 	},
 }
