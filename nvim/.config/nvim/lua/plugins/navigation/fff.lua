@@ -23,7 +23,7 @@ return {
 		},
 		max_threads = 8,
 		prompt = "↯ ",
-		title = "FFF↯",
+		title = "FFF",
 	},
 	lazy = true,
 	keys = {
@@ -45,6 +45,7 @@ return {
 			"<leader>fw",
 			function()
 				require("fff").live_grep({
+					title = "FFFuzzy Grep",
 					grep = {
 						modes = { "plain", "fuzzy" },
 					},
