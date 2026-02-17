@@ -23,12 +23,19 @@ local function set_search_hl()
 	vim.api.nvim_set_hl(0, "IncSearch", { fg = "#10131A", bg = "#FF8C42", bold = true })
 end
 
+local function set_cursorline_hl()
+	vim.api.nvim_set_hl(0, "CursorLine", { bg = "#1D2430" })
+	vim.api.nvim_set_hl(0, "CursorLineNr", { bold = false })
+end
+
 set_cursor_hl()
 set_search_hl()
+set_cursorline_hl()
 vim.api.nvim_create_autocmd("ColorScheme", {
 	callback = function()
 		set_cursor_hl()
 		set_search_hl()
+		set_cursorline_hl()
 	end,
 })
 
