@@ -41,6 +41,7 @@ return {
 				relativenumber = true, -- sets vim.opt.relativenumber
 				number = true, -- sets vim.opt.number
 				hlsearch = true, -- keep search highlights enabled
+				incsearch = true, -- stop / and ? from jumping while typing
 				ignorecase = true, -- case-insensitive search
 				smartcase = false, -- keep search fully case-insensitive
 				spell = false, -- sets vim.opt.spell
@@ -62,16 +63,22 @@ return {
 		mappings = {
 			-- first key is the mode
 			n = {
+				["<Leader>ff"] = false,
+				["<Leader>fw"] = false,
 				["<Esc>"] = {
 					function()
-						if vim.v.hlsearch == 1 then vim.cmd.nohlsearch() end
+						if vim.v.hlsearch == 1 then
+							vim.cmd.nohlsearch()
+						end
 					end,
 					desc = "Clear search highlight",
 				},
 				F = {
 					function()
-						local word = vim.fn.expand "<cword>"
-						if word == nil or word == "" then return end
+						local word = vim.fn.expand("<cword>")
+						if word == nil or word == "" then
+							return
+						end
 						local pattern = "\\V\\<" .. vim.fn.escape(word, "\\") .. "\\>"
 						vim.fn.setreg("/", pattern)
 						vim.opt.hlsearch = true
@@ -80,6 +87,8 @@ return {
 				},
 				n = { "nzzzv", desc = "Next search result (centered)" },
 				N = { "Nzzzv", desc = "Previous search result (centered)" },
+				["<C-o>"] = { "<C-o>zz", desc = "Jump back (centered)" },
+				["<C-i>"] = { "<C-i>zz", desc = "Jump forward (centered)" },
 				["<Leader>yp"] = {
 					function()
 						local path = vim.fn.expand("%:.")
