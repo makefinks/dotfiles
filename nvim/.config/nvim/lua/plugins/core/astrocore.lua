@@ -99,6 +99,22 @@ return {
 					desc = "Yank relative file path",
 				},
 			},
+			x = {
+				["<Leader>yp"] = {
+					function()
+						local path = vim.fn.expand("%:.")
+						local start_line = vim.fn.line("v")
+						local end_line = vim.api.nvim_win_get_cursor(0)[1]
+						local from_line = math.min(start_line, end_line)
+						local to_line = math.max(start_line, end_line)
+						local selection = string.format("%s:%d:%d", path, from_line, to_line)
+						vim.fn.setreg("+", selection)
+						vim.fn.setreg('"', selection)
+						Snacks.notifier.notify("Copied: " .. selection, "info", { title = "Path + Lines" })
+					end,
+					desc = "Yank relative file path with selected line range",
+				},
+			},
 		},
 	},
 }
