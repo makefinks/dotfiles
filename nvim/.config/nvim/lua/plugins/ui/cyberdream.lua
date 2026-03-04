@@ -22,7 +22,7 @@ return {
 			whichkey = true,
 		},
 
-		transparent = true,
+		transparent = false,
 		cache = true,
 		italic_comments = true,
 		-- hide_fillchars = true,
