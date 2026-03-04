@@ -6,6 +6,17 @@ return {
 		{ "<Leader>gb", false },
 		{ "<leader>fw", false },
 		{ "<Leader>gB", function() Snacks.picker.git_branches() end, desc = "Git branches" },
+		{
+			"<leader>lF",
+			function()
+				Snacks.picker.lsp_symbols({
+					filter = {
+						default = { "Function", "Method" },
+					},
+				})
+			end,
+			desc = "LSP Functions",
+		},
 	},
 	-- Lazy‑load on command or event if you like, e.g.:
 	-- cmd = "Snacks", event = "VeryLazy",
