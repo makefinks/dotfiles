@@ -3,6 +3,26 @@ return {
     "rebelot/heirline.nvim",
     opts = function(_, opts)
       local status = require "astroui.status"
+      local function diffview_progress()
+        local ok_lib, lib = pcall(require, "diffview.lib")
+        if not ok_lib then return nil end
+
+        local view = lib.get_current_view()
+        if not view or not view.cur_entry or not view.panel or not view.panel.ordered_file_list then return nil end
+
+        local ok_utils, utils = pcall(require, "diffview.utils")
+        if not ok_utils then return nil end
+
+        local files = view.panel:ordered_file_list()
+        local total = #files
+        if total == 0 then return nil end
+
+        local index = utils.vec_indexof(files, view.cur_entry)
+        if index < 1 then return nil end
+
+        return string.format("%d/%d", index, total)
+      end
+
       opts.statusline = {
         -- default highlight for the entire statusline
         hl = { fg = "fg", bg = "bg" },
@@ -56,6 +76,13 @@ return {
         -- fill the rest of the statusline
         -- the elements after this will appear in the middle of the statusline
         status.component.fill(),
+        status.component.builder {
+          provider = function()
+            local progress = diffview_progress()
+            return progress and (progress .. " files") or ""
+          end,
+          hl = { fg = "#e0af68" },
+        },
         -- add a component to display if the LSP is loading, disable showing running client names, and use no separator
         status.component.lsp {
           lsp_client_names = false,
