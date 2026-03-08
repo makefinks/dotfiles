@@ -5,6 +5,8 @@ vim.opt.guicursor = table.concat({
 	"o:hor50-Cursor/lCursor",
 	"a:blinkon1",
 }, ",")
+vim.opt.fillchars:append({ diff = "·" })
+vim.opt.diffopt:append({ "algorithm:histogram", "indent-heuristic", "linematch:60" })
 
 -- cursor color
 local CUR = "#2AC3DE"
@@ -28,14 +30,23 @@ local function set_cursorline_hl()
 	vim.api.nvim_set_hl(0, "CursorLineNr", { bold = false })
 end
 
+local function set_diff_hl()
+	vim.api.nvim_set_hl(0, "DiffAdd", { fg = "#7DCFFF", bg = "#1E3A5F" })
+	vim.api.nvim_set_hl(0, "DiffChange", { fg = "#7AA2F7", bg = "#223A5E" })
+	vim.api.nvim_set_hl(0, "DiffText", { fg = "#C0CAF5", bg = "#2B5B88", bold = true })
+	vim.api.nvim_set_hl(0, "DiffDelete", { fg = "#F7768E", bg = "#4A2230" })
+end
+
 set_cursor_hl()
 set_search_hl()
 set_cursorline_hl()
+set_diff_hl()
 vim.api.nvim_create_autocmd("ColorScheme", {
 	callback = function()
 		set_cursor_hl()
 		set_search_hl()
 		set_cursorline_hl()
+		set_diff_hl()
 	end,
 })
 

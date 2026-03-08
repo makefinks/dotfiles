@@ -2,7 +2,7 @@ return {
 	"folke/snacks.nvim",
 	priority = 1000,
 	keys = {
-		-- Remap snacks git branch picker to <leader>gB (vgit uses <leader>gb)
+		-- Remap snacks git branch picker to <leader>gB (<leader>gb is reserved for other git mappings)
 		{ "<Leader>gb", false },
 		{ "<leader>fw", false },
 		{ "<Leader>gB", function() Snacks.picker.git_branches() end, desc = "Git branches" },
