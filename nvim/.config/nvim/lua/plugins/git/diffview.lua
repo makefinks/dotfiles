@@ -108,6 +108,95 @@ local function confirm_discard_entry(callback)
   end)
 end
 
+local function get_current_diffview()
+  local ok, lib = pcall(require, "diffview.lib")
+  if not ok then
+    vim.notify("Diffview is not available", vim.log.levels.ERROR)
+    return nil
+  end
+
+  local view = lib.get_current_view()
+  if not view or not view.panel or not view.panel.ordered_file_list then
+    vim.notify("Current tab is not an active diffview", vim.log.levels.WARN)
+    return nil
+  end
+
+  return view
+end
+
+local function open_diffview_file_picker()
+  local view = get_current_diffview()
+  if not view then
+    return
+  end
+
+  local ok, fzf = pcall(require, "fzf-lua")
+  if not ok then
+    vim.notify("fzf-lua is required for the diffview picker", vim.log.levels.ERROR)
+    return
+  end
+  local fzf_utils = require "fzf-lua.utils"
+
+  local files = view.panel:ordered_file_list()
+  if not files or #files == 0 then
+    vim.notify("No files in the current diffview", vim.log.levels.WARN)
+    return
+  end
+
+  local entries = {}
+  local entry_by_index = {}
+  for i, file in ipairs(files) do
+    local details = string.format("[%s]", file.status or " ")
+    if file.oldpath and file.oldpath ~= "" and file.oldpath ~= file.path then
+      details = string.format("%s %s", details, file.oldpath)
+    end
+
+    local additions = file.stats and file.stats.additions or 0
+    local deletions = file.stats and file.stats.deletions or 0
+    local stats = string.format(
+      "%s %s",
+      fzf_utils.ansi_codes.blue("+" .. additions),
+      fzf_utils.ansi_codes.red("-" .. deletions)
+    )
+
+    local label = string.format("%d\t%s\t%s\t%s", i, file.path, stats, details)
+    entries[#entries + 1] = label
+    entry_by_index[i] = file
+  end
+
+  fzf.fzf_exec(entries, {
+    prompt = "Diffview Files> ",
+    winopts = {
+      title = " Diffview Files ",
+    },
+    fzf_opts = {
+      ["--delimiter"] = "\t",
+      ["--with-nth"] = "2,3,4",
+    },
+    previewer = false,
+    actions = {
+      ["enter"] = function(selected)
+        local choice = selected and selected[1]
+        local index = choice and tonumber(choice:match("^%s*(%d+)\t"))
+        local file = index and entry_by_index[index] or nil
+        if not file then return end
+
+        vim.schedule(function()
+          if view and view.set_file then
+            view:set_file(file, true, true)
+          end
+        end)
+      end,
+    },
+    fn_selected = function(selected, opts)
+      local action = selected and selected[1]
+      if action == "enter" and opts and opts.actions and opts.actions.enter then
+        opts.actions.enter(vim.list_slice(selected, 2), opts)
+      end
+    end,
+  })
+end
+
 return {
   "sindrets/diffview.nvim",
   cmd = { "DiffviewOpen", "DiffviewFileHistory", "DiffviewClose", "DiffviewFocusFiles" },
@@ -170,6 +259,12 @@ return {
         view = {
           {
             "n",
+            "ff",
+            open_diffview_file_picker,
+            { desc = "Search files in diffview" },
+          },
+          {
+            "n",
             "<leader>gs",
             actions.toggle_stage_entry,
             { desc = "Stage or unstage current file" },
@@ -190,6 +285,18 @@ return {
           },
         },
         file_panel = {
+          {
+            "n",
+            "f",
+            "<nop>",
+            { desc = "Disable flatten dirs toggle" },
+          },
+          {
+            "n",
+            "ff",
+            open_diffview_file_picker,
+            { desc = "Search files in diffview" },
+          },
           {
             "n",
             "<leader>gx",
