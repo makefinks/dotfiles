@@ -100,6 +100,14 @@ local function open_branch_preview(repo, rel, filetype, branch, split_mode)
   end, { buffer = buf, silent = true, desc = "Close branch preview buffer" })
 end
 
+local function confirm_discard_entry(callback)
+  vim.ui.select({ "Cancel", "Discard" }, { prompt = "Discard current file changes?" }, function(choice)
+    if choice == "Discard" then
+      callback()
+    end
+  end)
+end
+
 return {
   "sindrets/diffview.nvim",
   cmd = { "DiffviewOpen", "DiffviewFileHistory", "DiffviewClose", "DiffviewFocusFiles" },
@@ -168,12 +176,28 @@ return {
           },
           {
             "n",
+            "<leader>gx",
+            function()
+              confirm_discard_entry(actions.restore_entry)
+            end,
+            { desc = "Discard current file changes" },
+          },
+          {
+            "n",
             "<leader>e",
             actions.toggle_files,
             { desc = "Toggle the file panel" },
           },
         },
         file_panel = {
+          {
+            "n",
+            "<leader>gx",
+            function()
+              confirm_discard_entry(actions.restore_entry)
+            end,
+            { desc = "Discard current file changes" },
+          },
           {
             "n",
             "<leader>e",

@@ -8,6 +8,8 @@ vim.opt.guicursor = table.concat({
 vim.opt.fillchars:append({ diff = "·" })
 vim.opt.diffopt:append({ "algorithm:histogram", "indent-heuristic", "linematch:60" })
 
+require("utils.ghostty_progress").setup()
+
 -- cursor color
 local CUR = "#2AC3DE"
 
