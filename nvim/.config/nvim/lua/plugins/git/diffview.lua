@@ -260,6 +260,11 @@ return {
 
     require("diffview").setup {
       enhanced_diff_hl = true, -- better syntax highlighting
+      file_panel = {
+        win_config = {
+          width = 60,
+        },
+      },
       default_args = {
         DiffviewOpen = { "--untracked-files=no" },
       },
