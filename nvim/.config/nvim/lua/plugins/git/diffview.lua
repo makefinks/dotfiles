@@ -219,6 +219,11 @@ return {
       desc = "Project diff",
     },
     {
+      "<leader>gU",
+      "<cmd>DiffviewOpen -u<cr>",
+      desc = "Project diff (with untracked)",
+    },
+    {
       "<leader>gq",
       "<cmd>DiffviewClose<cr>",
       desc = "Close diffview",
@@ -255,6 +260,9 @@ return {
 
     require("diffview").setup {
       enhanced_diff_hl = true, -- better syntax highlighting
+      default_args = {
+        DiffviewOpen = { "--untracked-files=no" },
+      },
       keymaps = {
         view = {
           {
