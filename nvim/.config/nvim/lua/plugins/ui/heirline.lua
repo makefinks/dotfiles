@@ -1,9 +1,20 @@
 return {
   {
     "rebelot/heirline.nvim",
-    opts = function(_, opts)
-      local status = require "astroui.status"
-      local function diffview_progress()
+	    opts = function(_, opts)
+	      local status = require "astroui.status"
+        local previous_disable_winbar_cb = opts.opts and opts.opts.disable_winbar_cb
+
+        local function is_diffview_diff_window()
+          if not vim.wo.diff then
+            return false
+          end
+
+          local ok, lib = pcall(require, "diffview.lib")
+          return ok and lib.get_current_view() ~= nil
+        end
+
+	      local function diffview_progress()
         local ok_lib, lib = pcall(require, "diffview.lib")
         if not ok_lib then return nil end
 
@@ -21,6 +32,17 @@ return {
         if index < 1 then return nil end
 
         return string.format("%d/%d", index, total)
+      end
+
+      opts.opts = opts.opts or {}
+      opts.opts.disable_winbar_cb = function(args)
+        -- AstroNvim renders the winbar only for the active window. In Diffview
+        -- that adds a filename row to one pane, which shifts the diff out of alignment.
+        if is_diffview_diff_window() then
+          return true
+        end
+
+        return previous_disable_winbar_cb and previous_disable_winbar_cb(args) or false
       end
 
       opts.statusline = {
@@ -75,10 +97,10 @@ return {
         },
         -- fill the rest of the statusline
         -- the elements after this will appear in the middle of the statusline
-        status.component.fill(),
-        status.component.builder {
-          provider = function()
-            local progress = diffview_progress()
+	        status.component.fill(),
+	        status.component.builder {
+	          provider = function()
+	            local progress = diffview_progress()
             return progress and (progress .. " files") or ""
           end,
           hl = { fg = "#e0af68" },

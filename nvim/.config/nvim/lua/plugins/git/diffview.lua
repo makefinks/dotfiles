@@ -197,6 +197,19 @@ local function open_diffview_file_picker()
   })
 end
 
+local function clear_diffview_winbars()
+  local ok, lib = pcall(require, "diffview.lib")
+  if not ok or lib.get_current_view() == nil then
+    return
+  end
+
+  for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    if vim.api.nvim_win_is_valid(win) and vim.wo[win].diff then
+      vim.wo[win].winbar = nil
+    end
+  end
+end
+
 return {
   "sindrets/diffview.nvim",
   cmd = { "DiffviewOpen", "DiffviewFileHistory", "DiffviewClose", "DiffviewFocusFiles" },
@@ -257,6 +270,15 @@ return {
   },
   config = function()
     local actions = require "diffview.actions"
+    local diffview_group = vim.api.nvim_create_augroup("user_diffview_layout", { clear = true })
+
+    vim.api.nvim_create_autocmd("User", {
+      group = diffview_group,
+      pattern = { "DiffviewViewEnter", "DiffviewViewPostLayout", "DiffviewDiffBufWinEnter" },
+      callback = function()
+        vim.schedule(clear_diffview_winbars)
+      end,
+    })
 
     require("diffview").setup {
       enhanced_diff_hl = true, -- better syntax highlighting

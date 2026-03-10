@@ -5,7 +5,7 @@ vim.opt.guicursor = table.concat({
 	"o:hor50-Cursor/lCursor",
 	"a:blinkon1",
 }, ",")
-vim.opt.fillchars:append({ diff = "·" })
+vim.opt.fillchars:append({ diff = "/" })
 vim.opt.diffopt:append({ "algorithm:histogram", "indent-heuristic", "linematch:60" })
 
 require("utils.ghostty_progress").setup()
