@@ -3,7 +3,7 @@ return {
 	cmd = { "Neogit" },
 	dependencies = {
 		"nvim-lua/plenary.nvim",
-		"sindrets/diffview.nvim",
+		"esmuellert/codediff.nvim",
 		"nvim-telescope/telescope.nvim",
 	},
 	keys = {
@@ -17,7 +17,14 @@ return {
 	},
 	config = function()
 		local neogit = require("neogit")
-		neogit.setup({})
+		neogit.setup({
+			-- Route Neogit diff opens through codediff so the same explorer flow and keymaps apply everywhere.
+			integrations = {
+				codediff = true,
+			},
+			-- Use codediff as the diff viewer instead of the old diffview setup.
+			diff_viewer = "codediff",
+		})
 
 		local function set_neogit_diff_colors()
 			vim.api.nvim_set_hl(0, "NeogitDiffAddHighlight", { fg = "#5a9dc7", bg = "#2a3f4d" })

@@ -10,7 +10,8 @@ return {
     { "<leader>ma", mode = "v", desc = "Mole: annotate selection" },
   },
   opts = {
-    capture_mode = "location",
+    -- Capture the actual code snippet instead of just its location so annotations have context.
+    capture_mode = "snippet",
     picker = "snacks",
     format = {
       header = function()

@@ -1,49 +1,8 @@
 return {
   {
     "rebelot/heirline.nvim",
-	    opts = function(_, opts)
-	      local status = require "astroui.status"
-        local previous_disable_winbar_cb = opts.opts and opts.opts.disable_winbar_cb
-
-        local function is_diffview_diff_window()
-          if not vim.wo.diff then
-            return false
-          end
-
-          local ok, lib = pcall(require, "diffview.lib")
-          return ok and lib.get_current_view() ~= nil
-        end
-
-	      local function diffview_progress()
-        local ok_lib, lib = pcall(require, "diffview.lib")
-        if not ok_lib then return nil end
-
-        local view = lib.get_current_view()
-        if not view or not view.cur_entry or not view.panel or not view.panel.ordered_file_list then return nil end
-
-        local ok_utils, utils = pcall(require, "diffview.utils")
-        if not ok_utils then return nil end
-
-        local files = view.panel:ordered_file_list()
-        local total = #files
-        if total == 0 then return nil end
-
-        local index = utils.vec_indexof(files, view.cur_entry)
-        if index < 1 then return nil end
-
-        return string.format("%d/%d", index, total)
-      end
-
-      opts.opts = opts.opts or {}
-      opts.opts.disable_winbar_cb = function(args)
-        -- AstroNvim renders the winbar only for the active window. In Diffview
-        -- that adds a filename row to one pane, which shifts the diff out of alignment.
-        if is_diffview_diff_window() then
-          return true
-        end
-
-        return previous_disable_winbar_cb and previous_disable_winbar_cb(args) or false
-      end
+    opts = function(_, opts)
+      local status = require "astroui.status"
 
       opts.statusline = {
         -- default highlight for the entire statusline
@@ -91,20 +50,14 @@ return {
           surround = { separator = "none" },
         },
         -- add a component for the current git diff if it exists and use no separator for the sections
+        -- codediff now handles the dedicated diff view, so this keeps the statusline lightweight.
         status.component.git_diff {
           padding = { left = 1 },
           surround = { separator = "none" },
         },
         -- fill the rest of the statusline
         -- the elements after this will appear in the middle of the statusline
-	        status.component.fill(),
-	        status.component.builder {
-	          provider = function()
-	            local progress = diffview_progress()
-            return progress and (progress .. " files") or ""
-          end,
-          hl = { fg = "#e0af68" },
-        },
+        status.component.fill(),
         -- add a component to display if the LSP is loading, disable showing running client names, and use no separator
         status.component.lsp {
           lsp_client_names = false,
