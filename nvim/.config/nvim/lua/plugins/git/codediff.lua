@@ -6,6 +6,7 @@ local function notify_codediff_error(message)
 end
 
 local get_codediff_lifecycle
+local codediff_lsp_preload = require("plugins.git.codediff.lsp_preload")
 
 -- Resolve the current buffer to a repo-relative file so branch previews can reuse it.
 local function get_current_repo_file_info()
@@ -214,6 +215,8 @@ local function open_codediff_status_explorer(repo, focus_file, opts)
       set_codediff_explorer_options(vim.api.nvim_get_current_tabpage(), {
         hide_untracked = opts.hide_untracked ~= false,
       })
+
+      codediff_lsp_preload.preload(vim.api.nvim_get_current_tabpage(), repo, status_result, get_codediff_lifecycle)
     end)
   end)
 end
@@ -985,6 +988,7 @@ return {
       end
     end
 
+    -- Remove our custom mappings and any hidden preload buffers once the codediff tab is done.
     local function clear_custom_codediff_keymaps(tabpage)
       local lifecycle = get_codediff_lifecycle()
       if not lifecycle then
@@ -992,20 +996,25 @@ return {
       end
 
       local session = lifecycle.get_session(tabpage)
-      if not session or not session.keymap_buffers then
-        restore_markview_after_codediff(tabpage)
+      if not session then
         return
       end
 
-      restore_markview_after_codediff(tabpage)
+      if not session.keymap_buffers then
+        restore_markview_after_codediff(tabpage)
+      else
+        restore_markview_after_codediff(tabpage)
 
-      for bufnr, _ in pairs(session.keymap_buffers) do
-        if vim.api.nvim_buf_is_valid(bufnr) then
-          for _, lhs in ipairs(custom_codediff_keymaps) do
-            pcall(vim.keymap.del, "n", lhs, { buffer = bufnr })
+        for bufnr, _ in pairs(session.keymap_buffers) do
+          if vim.api.nvim_buf_is_valid(bufnr) then
+            for _, lhs in ipairs(custom_codediff_keymaps) do
+              pcall(vim.keymap.del, "n", lhs, { buffer = bufnr })
+            end
           end
         end
       end
+
+      codediff_lsp_preload.clear(tabpage, get_codediff_lifecycle)
     end
 
     vim.api.nvim_create_autocmd("User", {
