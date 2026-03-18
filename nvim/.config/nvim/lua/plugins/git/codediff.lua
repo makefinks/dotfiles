@@ -5,6 +5,8 @@ local function notify_codediff_error(message)
   end)
 end
 
+local get_codediff_lifecycle
+
 -- Resolve the current buffer to a repo-relative file so branch previews can reuse it.
 local function get_current_repo_file_info()
   local file = vim.api.nvim_buf_get_name(0)
@@ -133,8 +135,53 @@ local function get_codediff_modules()
   return codediff_git, view
 end
 
+local function filter_status_entries(entries)
+  local filtered = {}
+
+  for _, entry in ipairs(entries or {}) do
+    if entry.status ~= "??" then
+      filtered[#filtered + 1] = vim.deepcopy(entry)
+    end
+  end
+
+  return filtered
+end
+
+local function filter_untracked_status_result(status_result)
+  if not status_result then
+    return nil
+  end
+
+  return {
+    unstaged = filter_status_entries(status_result.unstaged),
+    staged = filter_status_entries(status_result.staged),
+    conflicts = filter_status_entries(status_result.conflicts),
+  }
+end
+
+local function set_codediff_explorer_options(tabpage, opts)
+  local lifecycle = get_codediff_lifecycle()
+  if not lifecycle then
+    return
+  end
+
+  local session = lifecycle.get_session(tabpage)
+  local explorer = lifecycle.get_explorer(tabpage)
+  if session then
+    session.hide_untracked = opts.hide_untracked or false
+  end
+
+  if explorer then
+    explorer.hide_untracked = opts.hide_untracked or false
+    if explorer.hide_untracked then
+      explorer.status_result = filter_untracked_status_result(explorer.status_result)
+    end
+  end
+end
+
 -- Open the explorer view for a repo status snapshot, optionally focusing a file.
-local function open_codediff_status_explorer(repo, focus_file)
+local function open_codediff_status_explorer(repo, focus_file, opts)
+  opts = opts or {}
   local codediff_git, view = get_codediff_modules()
   if not codediff_git or not view then
     return
@@ -144,6 +191,10 @@ local function open_codediff_status_explorer(repo, focus_file)
     if err then
       notify_codediff_error(err)
       return
+    end
+
+    if opts.hide_untracked ~= false then
+      status_result = filter_untracked_status_result(status_result)
     end
 
     vim.schedule(function()
@@ -159,12 +210,16 @@ local function open_codediff_status_explorer(repo, focus_file)
           focus_file = focus_file,
         },
       }, "")
+
+      set_codediff_explorer_options(vim.api.nvim_get_current_tabpage(), {
+        hide_untracked = opts.hide_untracked ~= false,
+      })
     end)
   end)
 end
 
 -- Safely access the active codediff lifecycle module.
-local function get_codediff_lifecycle()
+get_codediff_lifecycle = function()
   local ok, lifecycle = pcall(require, "codediff.ui.lifecycle")
   if not ok then
     vim.notify("Codediff is not available", vim.log.levels.ERROR)
@@ -730,6 +785,42 @@ local function open_codediff_file_picker(tabpage)
   })
 end
 
+local function install_codediff_refresh_filter()
+  local ok_refresh, refresh = pcall(require, "codediff.ui.explorer.refresh")
+  if not ok_refresh or refresh._user_hide_untracked_installed then
+    return
+  end
+
+  local original_refresh = refresh.refresh
+  refresh.refresh = function(explorer, ...)
+    if not explorer or not explorer.hide_untracked then
+      return original_refresh(explorer, ...)
+    end
+
+    local ok_git, git = pcall(require, "codediff.core.git")
+    if not ok_git or type(git.get_status) ~= "function" then
+      return original_refresh(explorer, ...)
+    end
+
+    local original_get_status = git.get_status
+    git.get_status = function(git_root, callback)
+      return original_get_status(git_root, function(err, status_result)
+        callback(err, filter_untracked_status_result(status_result))
+      end)
+    end
+
+    local ok, result = pcall(original_refresh, explorer, ...)
+    git.get_status = original_get_status
+    if not ok then
+      error(result)
+    end
+
+    return result
+  end
+
+  refresh._user_hide_untracked_installed = true
+end
+
 return {
   "esmuellert/codediff.nvim",
   cmd = { "CodeDiff" },
@@ -742,7 +833,7 @@ return {
           return
         end
 
-        open_codediff_status_explorer(context.repo, context.rel)
+        open_codediff_status_explorer(context.repo, context.rel, { hide_untracked = true })
       end,
       desc = "Current file diff",
     },
@@ -754,7 +845,7 @@ return {
           return
         end
 
-        open_codediff_status_explorer(repo)
+        open_codediff_status_explorer(repo, nil, { hide_untracked = true })
       end,
       desc = "Project diff",
     },
@@ -766,7 +857,7 @@ return {
           return
         end
 
-        open_codediff_status_explorer(repo)
+        open_codediff_status_explorer(repo, nil, { hide_untracked = false })
       end,
       desc = "Project diff (with untracked)",
     },
@@ -803,29 +894,10 @@ return {
     },
   },
   config = function()
+    install_codediff_refresh_filter()
+
     local codediff_group = vim.api.nvim_create_augroup("user_codediff", { clear = true })
-    local custom_codediff_keymaps = { "<CR>", "ff", "<leader>e", "<leader>gs", "<leader>gx", "s", "u", "x" }
-
-    local function disable_codediff_auto_open(tabpage)
-      local lifecycle = get_codediff_lifecycle()
-      local explorer = lifecycle and lifecycle.get_explorer(tabpage) or nil
-      if not explorer or explorer.manual_open_only or type(explorer.on_file_select) ~= "function" then
-        return
-      end
-
-      -- Keep the explorer focused on the list until the user explicitly opens an entry.
-      local on_file_select = explorer.on_file_select
-      explorer.manual_open_only = true
-      explorer.skip_initial_auto_open = true
-      explorer.on_file_select = function(file_data, opts)
-        if explorer.skip_initial_auto_open then
-          explorer.skip_initial_auto_open = false
-          return
-        end
-
-        on_file_select(file_data, opts)
-      end
-    end
+    local custom_codediff_keymaps = { "<CR>", "<Tab>", "<S-Tab>", "ff", "<leader>e", "<leader>gs", "<leader>gx", "s", "u", "x" }
 
     local function set_custom_codediff_keymaps(tabpage)
       local lifecycle = get_codediff_lifecycle()
@@ -835,7 +907,6 @@ return {
       end
 
       disable_markview_in_codediff(tabpage)
-      disable_codediff_auto_open(tabpage)
 
       lifecycle.set_tab_keymap(tabpage, "n", "ff", function()
         open_codediff_file_picker(tabpage)
@@ -853,14 +924,52 @@ return {
         restore_codediff_entry(tabpage)
       end, { desc = "Discard current entry" })
 
+      local original_bufnr, modified_bufnr = lifecycle.get_buffers(tabpage)
+      for _, bufnr in ipairs({ original_bufnr, modified_bufnr }) do
+        if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+          session.keymap_buffers = session.keymap_buffers or {}
+          session.keymap_buffers[bufnr] = true
+
+          vim.keymap.set("n", "s", function()
+            stage_codediff_entry(tabpage)
+          end, { buffer = bufnr, noremap = true, silent = true, nowait = true, desc = "Stage current entry" })
+
+          vim.keymap.set("n", "u", function()
+            unstage_codediff_entry(tabpage)
+          end, { buffer = bufnr, noremap = true, silent = true, nowait = true, desc = "Unstage current entry" })
+
+          vim.keymap.set("n", "x", function()
+            restore_codediff_entry(tabpage)
+          end, { buffer = bufnr, noremap = true, silent = true, nowait = true, desc = "Discard current entry" })
+
+          vim.keymap.set("n", "<leader>gs", function()
+            toggle_codediff_stage(tabpage)
+          end, { buffer = bufnr, noremap = true, silent = true, nowait = true, desc = "Stage/unstage current entry" })
+        end
+      end
+
       local explorer = lifecycle.get_explorer(tabpage)
+      if explorer then
+        explorer.hide_untracked = session.hide_untracked or false
+      end
       if explorer and explorer.bufnr and vim.api.nvim_buf_is_valid(explorer.bufnr) then
+        local ok_navigation, navigation = pcall(require, "codediff.ui.view.navigation")
         session.keymap_buffers = session.keymap_buffers or {}
         session.keymap_buffers[explorer.bufnr] = true
 
         vim.keymap.set("n", "<CR>", function()
           open_codediff_explorer_entry(tabpage, explorer)
         end, { buffer = explorer.bufnr, noremap = true, silent = true, nowait = true, desc = "Open current codediff entry" })
+
+        if ok_navigation then
+          vim.keymap.set("n", "<Tab>", function()
+            navigation.next_file()
+          end, { buffer = explorer.bufnr, noremap = true, silent = true, nowait = true, desc = "Next codediff file" })
+
+          vim.keymap.set("n", "<S-Tab>", function()
+            navigation.prev_file()
+          end, { buffer = explorer.bufnr, noremap = true, silent = true, nowait = true, desc = "Previous codediff file" })
+        end
 
         vim.keymap.set("n", "s", function()
           stage_codediff_entry(tabpage)
@@ -932,6 +1041,7 @@ return {
     require("codediff").setup {
       diff = {
         layout = "side-by-side",
+        cycle_next_hunk = false,
         -- Stop at the first/last file instead of wrapping back around.
         cycle_next_file = false,
       },
