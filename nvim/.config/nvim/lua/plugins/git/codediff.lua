@@ -900,7 +900,7 @@ return {
     install_codediff_refresh_filter()
 
     local codediff_group = vim.api.nvim_create_augroup("user_codediff", { clear = true })
-    local custom_codediff_keymaps = { "<CR>", "<Tab>", "<S-Tab>", "ff", "<leader>e", "<leader>gs", "<leader>gx", "s", "u", "x" }
+    local custom_codediff_keymaps = { "<CR>", "<Tab>", "<S-Tab>", "<C-q>", "ff", "<leader>gs", "<leader>gx", "s", "u", "x" }
 
     local function set_custom_codediff_keymaps(tabpage)
       local lifecycle = get_codediff_lifecycle()
@@ -926,6 +926,10 @@ return {
       lifecycle.set_tab_keymap(tabpage, "n", "<leader>gx", function()
         restore_codediff_entry(tabpage)
       end, { desc = "Discard current entry" })
+
+      lifecycle.set_tab_keymap(tabpage, "n", "<C-q>", function()
+        close_codediff_view()
+      end, { desc = "Close codediff view" })
 
       local original_bufnr, modified_bufnr = lifecycle.get_buffers(tabpage)
       for _, bufnr in ipairs({ original_bufnr, modified_bufnr }) do
@@ -1000,11 +1004,9 @@ return {
         return
       end
 
-      if not session.keymap_buffers then
-        restore_markview_after_codediff(tabpage)
-      else
-        restore_markview_after_codediff(tabpage)
+      restore_markview_after_codediff(tabpage)
 
+      if session.keymap_buffers then
         for bufnr, _ in pairs(session.keymap_buffers) do
           if vim.api.nvim_buf_is_valid(bufnr) then
             for _, lhs in ipairs(custom_codediff_keymaps) do
