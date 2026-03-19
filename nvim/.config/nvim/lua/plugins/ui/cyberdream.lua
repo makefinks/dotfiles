@@ -12,7 +12,6 @@ return {
 			grapple = true,
 			heirline = true,
 			lazy = true,
-			markview = true,
 			mini = true,
 			neogit = true,
 			noice = true,
