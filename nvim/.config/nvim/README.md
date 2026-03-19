@@ -99,6 +99,7 @@ pip install pynvim
 | **snacks**           | Utility collection       | ✓    | ✓    | Provides dashboard, notifications, file picker and other UI utils                                  |
 | **toggleterm**       | Terminal management      | ✓    | ✓    | Quick terminal access with customizable layouts (horizontal/vertical/float)                        |
 | **autopairs**        | Auto-closing brackets    | ✓    | ✓    | Automatically closes brackets, quotes, and pairs with smart rules for different filetypes          |
+| **yanky**            | Yank ring and paste history | ✓ | ✓ | Improves yank and put behavior with history cycling, highlighting, and a picker                    |
 | **resession**        | Session management       | ✓    | ✓    | Auto-saves and restores workspace sessions including open files, cursor positions, and layout      |
 | **markdown-preview** | Live markdown preview    | ✓    | ✓    | Real-time preview of markdown files with GitHub-style rendering                                    |
 | **startup-time**     | Performance monitoring   | ✓    | ✓    | Tracks and displays Neovim startup time for optimization                                           |
