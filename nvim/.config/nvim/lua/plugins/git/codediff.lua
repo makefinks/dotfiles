@@ -99,6 +99,7 @@ return {
       pattern = "CodeDiffOpen",
       callback = function(args)
         local tabpage = args.data and args.data.tabpage or vim.api.nvim_get_current_tabpage()
+        codediff_view.ensure_explorer_window_state(get_codediff_lifecycle, tabpage)
         codediff_keymaps.set_tab_keymaps(tabpage, get_codediff_lifecycle, {
           actions = codediff_actions,
           view = codediff_view,
@@ -112,6 +113,7 @@ return {
         local tabpage = vim.api.nvim_get_current_tabpage()
         vim.schedule(function()
           if vim.api.nvim_tabpage_is_valid(tabpage) then
+            codediff_view.ensure_explorer_window_state(get_codediff_lifecycle, tabpage)
             codediff_keymaps.set_tab_keymaps(tabpage, get_codediff_lifecycle, {
               actions = codediff_actions,
               view = codediff_view,

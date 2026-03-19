@@ -2,6 +2,23 @@ local M = {}
 
 local helpers = require "plugins.git.codediff.helpers"
 
+local function get_explorer_winid(explorer)
+  if not explorer then
+    return nil
+  end
+
+  return explorer.split and explorer.split.winid or explorer.winid
+end
+
+local function disable_panel_scrollbind(winid)
+  if not winid or not vim.api.nvim_win_is_valid(winid) then
+    return
+  end
+
+  vim.wo[winid].scrollbind = false
+  vim.wo[winid].cursorbind = false
+end
+
 local function set_explorer_options(get_codediff_lifecycle, tabpage, opts)
   local lifecycle = get_codediff_lifecycle()
   if not lifecycle then
@@ -100,7 +117,18 @@ function M.get_explorer(get_codediff_lifecycle, tabpage)
     return nil
   end
 
-  return lifecycle.get_explorer(tabpage)
+  local explorer = lifecycle.get_explorer(tabpage)
+  disable_panel_scrollbind(get_explorer_winid(explorer))
+  return explorer
+end
+
+function M.ensure_explorer_window_state(get_codediff_lifecycle, tabpage)
+  local explorer = M.get_explorer(get_codediff_lifecycle, tabpage)
+  if not explorer then
+    return
+  end
+
+  disable_panel_scrollbind(get_explorer_winid(explorer))
 end
 
 -- Hide/show the explorer while keeping the active diff windows usable.
@@ -139,6 +167,7 @@ function M.toggle_explorer(get_codediff_lifecycle, tabpage)
     vim.schedule(function()
       local winid = explorer.split and explorer.split.winid or explorer.winid
       if winid and vim.api.nvim_win_is_valid(winid) then
+        disable_panel_scrollbind(winid)
         vim.api.nvim_set_current_win(winid)
       end
     end)
@@ -165,6 +194,18 @@ function M.focus_diff_window(get_codediff_lifecycle, tabpage)
 
   vim.api.nvim_set_current_win(target_win)
   return true
+end
+
+function M.select_explorer_file(get_codediff_lifecycle, tabpage, explorer, file_data)
+  if not explorer or not file_data then
+    return
+  end
+
+  disable_panel_scrollbind(get_explorer_winid(explorer))
+  explorer.on_file_select(file_data)
+  vim.schedule(function()
+    disable_panel_scrollbind(get_explorer_winid(explorer))
+  end)
 end
 
 -- Open the selected explorer node, or expand/collapse groups and directories.
@@ -194,7 +235,7 @@ function M.open_explorer_entry(get_codediff_lifecycle, tabpage, explorer)
 
   local same_selection = explorer.current_file_path == node.data.path and explorer.current_file_group == node.data.group
   if not same_selection then
-    explorer.on_file_select(node.data)
+    M.select_explorer_file(get_codediff_lifecycle, tabpage, explorer, node.data)
   end
 
   vim.schedule(function()

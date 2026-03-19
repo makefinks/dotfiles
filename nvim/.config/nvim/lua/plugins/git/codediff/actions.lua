@@ -421,7 +421,7 @@ function M.open_file_picker(get_codediff_lifecycle, tabpage)
         end
 
         vim.schedule(function()
-          explorer.on_file_select(file)
+          view.select_explorer_file(get_codediff_lifecycle, tabpage, explorer, file)
         end)
       end,
     },
