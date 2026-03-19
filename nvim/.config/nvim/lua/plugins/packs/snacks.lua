@@ -22,8 +22,9 @@ return {
 	-- cmd = "Snacks", event = "VeryLazy",
 	opts = function()
 		local quotes = require("utils.quotes")
+		local quote_formatter = require("utils.quote_formatter")
 
-		local header = [[
+		local logo = [[
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣀⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⣤⠀⠀⢀⣶⢇⣿⠇⠀⠀⠀⢀⣾⣿⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣿⣿⣠⣤⣬⣽⣶⠆⠀⠀⠀⢀⣾⣿⠃⠀⣤⣶⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
@@ -47,15 +48,15 @@ return {
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
     ]]
 
-		local quote = quotes.get_quote()
-		local quote_formatter = require("utils.quote_formatter")
-		header = header .. "\n\n" .. quote_formatter.format_quote(quote.text, quote.author)
+		local function dashboard_header()
+			local quote = quotes.get_current_quote()
+			return logo .. "\n\n" .. quote_formatter.format_quote(quote.text, quote.author)
+		end
 
 		return {
 			input = { enabled = true },
 			dashboard = {
 				preset = {
-					header = header,
 					-- stylua: ignore
 					---@type snacks.dashboard.Item[]
 					header_hl = "SnacksDashboardHeader", -- You can customize this
@@ -74,16 +75,19 @@ return {
 							action = ":lua require('fff').live_grep()",
 						},
 						{
+							icon = "󰇌 ",
+							key = "l",
+							desc = "New Quote",
+							action = function()
+								quotes.random_quote()
+								Snacks.dashboard.update()
+							end,
+						},
+						{
 							icon = " ",
 							key = "r",
 							desc = "Recent Files",
 							action = ":lua Snacks.dashboard.pick('oldfiles')",
-						},
-						{
-							icon = " ",
-							key = "c",
-							desc = "Config",
-							action = ":lua Snacks.dashboard.pick('files', {cwd = vim.fn.stdpath('config')})",
 						},
 						{ icon = " ", key = "s", desc = "Restore Session", section = "session" },
 						{
@@ -95,6 +99,13 @@ return {
 						},
 						{ icon = " ", key = "q", desc = "Quit", action = ":qa" },
 					},
+				},
+				sections = {
+					function()
+						return { header = dashboard_header(), padding = 2 }
+					end,
+					{ section = "keys", gap = 1, padding = 1 },
+					{ section = "startup" },
 				},
 			},
 			bigfile = { enabled = true },

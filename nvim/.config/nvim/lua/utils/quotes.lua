@@ -268,13 +268,462 @@ local quotes = {
 	},
 	{ author = "Kevlin Henney", text = "There is no code faster than no code." },
 	{ author = "Kevlin Henney", text = "The best time to delete code is before you write it." },
+	{ author = "Tim Peters", text = "Beautiful is better than ugly.", source = "https://peps.python.org/pep-0020/" },
+	{ author = "Tim Peters", text = "Simple is better than complex.", source = "https://peps.python.org/pep-0020/" },
+	{
+		author = "Tim Peters",
+		text = "Complex is better than complicated.",
+		source = "https://peps.python.org/pep-0020/",
+	},
+	{ author = "Tim Peters", text = "Flat is better than nested.", source = "https://peps.python.org/pep-0020/" },
+	{ author = "Tim Peters", text = "Sparse is better than dense.", source = "https://peps.python.org/pep-0020/" },
+	{ author = "Tim Peters", text = "Readability counts.", source = "https://peps.python.org/pep-0020/" },
+	{
+		author = "Tim Peters",
+		text = "Special cases aren't special enough to break the rules.",
+		source = "https://peps.python.org/pep-0020/",
+	},
+	{
+		author = "Tim Peters",
+		text = "Although practicality beats purity.",
+		source = "https://peps.python.org/pep-0020/",
+	},
+	{
+		author = "Tim Peters",
+		text = "Errors should never pass silently.",
+		source = "https://peps.python.org/pep-0020/",
+	},
+	{ author = "Tim Peters", text = "Unless explicitly silenced.", source = "https://peps.python.org/pep-0020/" },
+	{
+		author = "Tim Peters",
+		text = "In the face of ambiguity, refuse the temptation to guess.",
+		source = "https://peps.python.org/pep-0020/",
+	},
+	{
+		author = "Tim Peters",
+		text = "There should be one-- and preferably only one --obvious way to do it.",
+		source = "https://peps.python.org/pep-0020/",
+	},
+	{
+		author = "Tim Peters",
+		text = "Although that way may not be obvious at first unless you're Dutch.",
+		source = "https://peps.python.org/pep-0020/",
+	},
+	{ author = "Tim Peters", text = "Now is better than never.", source = "https://peps.python.org/pep-0020/" },
+	{
+		author = "Tim Peters",
+		text = "Although never is often better than *right* now.",
+		source = "https://peps.python.org/pep-0020/",
+	},
+	{
+		author = "Tim Peters",
+		text = "If the implementation is hard to explain, it's a bad idea.",
+		source = "https://peps.python.org/pep-0020/",
+	},
+	{
+		author = "Tim Peters",
+		text = "If the implementation is easy to explain, it may be a good idea.",
+		source = "https://peps.python.org/pep-0020/",
+	},
+	{
+		author = "Tim Peters",
+		text = "Namespaces are one honking great idea -- let's do more of those!",
+		source = "https://peps.python.org/pep-0020/",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "With networking, much like programming, numbering SHOULD always start with zero.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "It Has To Work.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "No matter how hard you push and no matter what the priority, you can't increase the speed of light. You can, however, slow it down.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "No matter how hard you try, you can't make a baby in much less than 9 months. Trying to speed this up *might* make it slower, but it won't make it happen any quicker.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "With sufficient thrust, pigs fly just fine. However, this is not necessarily a good idea.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Some things in life can never be fully appreciated nor understood unless experienced firsthand.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "It is always possible to agglutinate multiple separate problems into a single complex interdependent solution. In most cases this is a bad idea.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "It is easier to move a problem around than it is to solve it.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "It is always possible to add another level of indirection.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "It is always something.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Good, Fast, Cheap: Pick any two (you can't have all three).",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "It is more complicated than you think.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "For all resources, whatever it is, you need more.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Every information technology problem always takes longer to solve than it seems like it should.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "One size never fits all.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Every old idea will be proposed again with a different name and a different presentation, regardless of whether it works.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "In protocol design, perfection has been reached not when there is nothing left to add, but when there is nothing left to take away.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "The network is at fault until proven innocent.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Automation is encouraged and oftentimes recommended. (even at times when it shouldn't be.)",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Never make a change unless you know the impact or ramifications of said change.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Never test in production.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Layer 8 of the Open Systems Interconnection (OSI) model is People.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Layer 9 of the Open Systems Interconnection (OSI) model is company/external regulations, rules, and restrictions.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Layer 10 of the Open Systems Interconnection (OSI) model is money, budget, and funds.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Reserved for Catch-22s.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "If it can break, it will break, unexpectedly, on a weekend/holiday.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Fail-over and high availability are not suggestions. Remember to test regularly!",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Change or version control are not a suggestion.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "You will get no praise when everything is working. Expect to only be needed when things break.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Cloud simply means somebody else's data center/network.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "When things don't work, escalate harder.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Never assume any software is free of bugs/defects.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "IPv6 should replace IPv4 any day now.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "There can always be more people on the conference call.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "TIAAA (There Is Always Another Acronym).",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "There is no such thing as a random issue.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Trust but verify should be the approach to any situation.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "The packets don't lie.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Wireless might as well be magic.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Nothing is ever truly 100% secure.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Everybody's title is made up.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "One of the hardest parts of any IT professional's day is the process of copying a file from a client to a server.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Documentation, while REQUIRED, is never complete or up-to-date.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "A minimum of two data points should be collected in order to properly point the finger.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "It is very likely somebody has always thought of it before you.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Fear of the unknown oftentimes supersedes common sense.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Your microphone behaves much like Schrodinger's cat.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Sometimes a device needs a reload and there SHOULD be no further justification beyond that fact required.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "The best engineers know how to properly discern the false debug errors from the real debug errors.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "The link you saved will change, break, or go away.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Somewhere, right now, a group of individuals are arguing about a SHOULD vs a MUST.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "You never know when you will need that cable. Better hold onto it.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "In IT the number of monitors directly correlates to efficiency.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "Kyzer Davis",
+		text = "Your solution is likely way more complicated than required.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{ author = "Kyzer Davis", text = "Experimental.", source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html" },
+	{
+		author = "Kyzer Davis",
+		text = "Reserved for Future Use (but will likely never be used.)",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
+	{
+		author = "J. Snijders et al.",
+		text = "Authors MUST NOT implement bugs.",
+		source = "https://datatracker.ietf.org/doc/html/rfc9225",
+	},
+	{
+		author = "J. Snijders et al.",
+		text = "If bugs are introduced in code, they MUST be clearly documented.",
+		source = "https://datatracker.ietf.org/doc/html/rfc9225",
+	},
+	{
+		author = "J. Snijders et al.",
+		text = "When implementing specifications that are broken by design, it is RECOMMENDED to aggregate multiple smaller bugs into one larger bug.",
+		source = "https://datatracker.ietf.org/doc/html/rfc9225",
+	},
+	{
+		author = "J. Snijders et al.",
+		text = "The aphorism \"It's not a bug, it's a feature\" is considered rude.",
+		source = "https://datatracker.ietf.org/doc/html/rfc9225",
+	},
+	{
+		author = "J. Snijders et al.",
+		text = "Assume all external input is the result of bugs.",
+		source = "https://datatracker.ietf.org/doc/html/rfc9225",
+	},
+	{
+		author = "J. Snijders et al.",
+		text = "In fact, assume all internal inputs also are the result of bugs.",
+		source = "https://datatracker.ietf.org/doc/html/rfc9225",
+	},
+	{
+		author = "J. Snijders et al.",
+		text = "Implementers MUST NOT introduce bugs when writing software.",
+		source = "https://datatracker.ietf.org/doc/html/rfc9225",
+	},
+	{
+		author = "J. Snijders et al.",
+		text = "Unexpected results caused by bugs are not a valid substitute for high-quality random number generators.",
+		source = "https://datatracker.ietf.org/doc/html/rfc9225",
+	},
+	{
+		author = "J. Snijders et al.",
+		text = "Unsupervised study of the Digest archive may induce a sense of panic.",
+		source = "https://datatracker.ietf.org/doc/html/rfc9225",
+	},
+	{
+		author = "Rob Pike",
+		text = "Don't communicate by sharing memory, share memory by communicating.",
+		source = "https://go-proverbs.github.io/",
+	},
+	{ author = "Rob Pike", text = "Concurrency is not parallelism.", source = "https://go-proverbs.github.io/" },
+	{
+		author = "Rob Pike",
+		text = "Channels orchestrate; mutexes serialize.",
+		source = "https://go-proverbs.github.io/",
+	},
+	{ author = "Rob Pike", text = "Make the zero value useful.", source = "https://go-proverbs.github.io/" },
+	{ author = "Rob Pike", text = "interface{} says nothing.", source = "https://go-proverbs.github.io/" },
+	{
+		author = "Rob Pike",
+		text = "Gofmt's style is no one's favorite, yet gofmt is everyone's favorite.",
+		source = "https://go-proverbs.github.io/",
+	},
+	{
+		author = "Rob Pike",
+		text = "Syscall must always be guarded with build tags.",
+		source = "https://go-proverbs.github.io/",
+	},
+	{
+		author = "Rob Pike",
+		text = "Cgo must always be guarded with build tags.",
+		source = "https://go-proverbs.github.io/",
+	},
+	{ author = "Rob Pike", text = "Cgo is not Go.", source = "https://go-proverbs.github.io/" },
+	{
+		author = "Rob Pike",
+		text = "With the unsafe package there are no guarantees.",
+		source = "https://go-proverbs.github.io/",
+	},
+	{ author = "Rob Pike", text = "Clear is better than clever.", source = "https://go-proverbs.github.io/" },
+	{ author = "Rob Pike", text = "Reflection is never clear.", source = "https://go-proverbs.github.io/" },
+	{ author = "Rob Pike", text = "Errors are values.", source = "https://go-proverbs.github.io/" },
+	{
+		author = "Rob Pike",
+		text = "Don't just check errors, handle them gracefully.",
+		source = "https://go-proverbs.github.io/",
+	},
+	{
+		author = "Rob Pike",
+		text = "Design the architecture, name the components, document the details.",
+		source = "https://go-proverbs.github.io/",
+	},
+	{ author = "Rob Pike", text = "Documentation is for users.", source = "https://go-proverbs.github.io/" },
+	{ author = "Rob Pike", text = "Don't panic.", source = "https://go-proverbs.github.io/" },
 }
 
 local current_index = math.random(#quotes)
 
+local function random_index(excluding)
+	if #quotes <= 1 then
+		return 1
+	end
+
+	local index = math.random(#quotes - 1)
+	if excluding and index >= excluding then
+		index = index + 1
+	end
+	return index
+end
+
 function M.get_quote()
-	local index = math.random(#quotes)
-	return quotes[index]
+	current_index = random_index()
+	return quotes[current_index]
+end
+
+function M.random_quote()
+	current_index = random_index(current_index)
+	return quotes[current_index]
 end
 
 function M.cycle_quote()
