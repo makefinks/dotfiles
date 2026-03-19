@@ -2,6 +2,23 @@ local M = {}
 
 local view = require "plugins.git.codediff.view"
 
+local function find_current_selection(explorer, file_path, group)
+  if explorer.current_selection and explorer.current_selection.path == file_path and explorer.current_selection.group == group then
+    return vim.deepcopy(explorer.current_selection)
+  end
+
+  local group_entries = explorer.status_result and explorer.status_result[group] or nil
+  for _, entry in ipairs(group_entries or {}) do
+    if entry.path == file_path then
+      local selection = vim.deepcopy(entry)
+      selection.group = group
+      return selection
+    end
+  end
+
+  return nil
+end
+
 local function get_next_file_in_group(explorer, current_path, target_group)
   local ok, refresh = pcall(require, "codediff.ui.explorer.refresh")
   if not ok then
@@ -142,6 +159,29 @@ local function get_stage_context(get_codediff_lifecycle, tabpage)
   }
 end
 
+local function get_restore_context(get_codediff_lifecycle, tabpage)
+  local context = get_stage_context(get_codediff_lifecycle, tabpage)
+  if not context then
+    return nil
+  end
+
+  if context.in_explorer then
+    return context
+  end
+
+  if context.is_directory or not context.file_path or not context.group then
+    return nil
+  end
+
+  local selection = find_current_selection(context.explorer, context.file_path, context.group)
+  if not selection then
+    return nil
+  end
+
+  context.status = selection.status
+  return context
+end
+
 -- Stage the current file or directory and advance selection when possible.
 function M.stage_entry(get_codediff_lifecycle, tabpage)
   local context = get_stage_context(get_codediff_lifecycle, tabpage)
@@ -245,8 +285,8 @@ end
 
 -- Discard the current file changes through the explorer's restore action.
 function M.restore_entry(get_codediff_lifecycle, tabpage)
-  local explorer = view.get_explorer(get_codediff_lifecycle, tabpage)
-  if not explorer or not explorer.tree then
+  local context = get_restore_context(get_codediff_lifecycle, tabpage)
+  if not context then
     vim.notify("Discard is only available in codediff explorer mode", vim.log.levels.WARN)
     return
   end
@@ -257,7 +297,51 @@ function M.restore_entry(get_codediff_lifecycle, tabpage)
     return
   end
 
-  action_mod.restore_entry(explorer, explorer.tree)
+  if context.in_explorer then
+    action_mod.restore_entry(context.explorer, context.explorer.tree)
+    return
+  end
+
+  local ok_git, git = pcall(require, "codediff.core.git")
+  local ok_refresh, refresh = pcall(require, "codediff.ui.explorer.refresh")
+  if not ok_git or not ok_refresh then
+    vim.notify("Failed to load codediff discard helpers", vim.log.levels.ERROR)
+    return
+  end
+
+  if context.group ~= "unstaged" then
+    vim.notify("Can only restore unstaged changes", vim.log.levels.WARN)
+    return
+  end
+
+  local is_untracked = context.status == "??"
+  local prompt = (is_untracked and "Delete " or "Discard changes to ") .. context.file_path .. "?"
+  local choice = vim.fn.confirm(prompt, "&Discard\n&Cancel", 2, "Warning")
+  if choice ~= 1 then
+    vim.cmd "echo ''"
+    return
+  end
+
+  local after_restore = function(err)
+    if err then
+      vim.schedule(function()
+        vim.notify(err, vim.log.levels.ERROR)
+      end)
+      return
+    end
+
+    vim.schedule(function()
+      refresh.refresh(context.explorer)
+    end)
+  end
+
+  if is_untracked then
+    git.delete_untracked(context.explorer.git_root, context.file_path, after_restore)
+  else
+    git.restore_file(context.explorer.git_root, context.file_path, context.explorer.base_revision, after_restore)
+  end
+
+  vim.cmd "echo ''"
 end
 
 -- Open a file picker over all explorer entries for faster jump navigation.
