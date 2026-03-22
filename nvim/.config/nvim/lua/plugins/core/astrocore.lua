@@ -64,6 +64,7 @@ return {
 			-- first key is the mode
 			n = {
 				["<Leader>ff"] = false,
+				["<Leader>fs"] = false,
 				["<Leader>fw"] = false,
 				["<Esc>"] = {
 					function()

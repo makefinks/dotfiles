@@ -52,6 +52,7 @@ return {
 	end,
 	lazy = true,
 	keys = {
+		{ "<leader>fs", false },
 		{
 			"ff",
 			function()

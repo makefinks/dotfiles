@@ -131,6 +131,60 @@ function M.ensure_explorer_window_state(get_codediff_lifecycle, tabpage)
   disable_panel_scrollbind(get_explorer_winid(explorer))
 end
 
+function M.get_file_position(tabpage)
+  tabpage = tabpage or vim.api.nvim_get_current_tabpage()
+
+  local lifecycle = package.loaded["codediff.ui.lifecycle"]
+  if not lifecycle then
+    return nil
+  end
+
+  local session = lifecycle.get_session(tabpage)
+  if not session or session.mode ~= "explorer" then
+    return nil
+  end
+
+  local explorer = lifecycle.get_explorer(tabpage)
+  if not explorer or not explorer.tree or not explorer.current_file_path or not explorer.current_file_group then
+    return nil
+  end
+
+  local ok_refresh, refresh = pcall(require, "codediff.ui.explorer.refresh")
+  if not ok_refresh or type(refresh.get_all_files) ~= "function" then
+    return nil
+  end
+
+  local files = refresh.get_all_files(explorer.tree)
+  local total = #files
+  if total == 0 then
+    return nil
+  end
+
+  local current_index = nil
+  for i, file in ipairs(files) do
+    local data = file.data
+    if data and data.path == explorer.current_file_path and data.group == explorer.current_file_group then
+      current_index = i
+      break
+    end
+  end
+
+  if not current_index then
+    return nil
+  end
+
+  return string.format("%d/%d", current_index, total)
+end
+
+function M.echo_file_position(tabpage)
+  local position = M.get_file_position(tabpage)
+  if not position then
+    return
+  end
+
+  vim.api.nvim_echo({ { string.format("%s files", position), "ModeMsg" } }, false, {})
+end
+
 -- Hide/show the explorer while keeping the active diff windows usable.
 function M.toggle_explorer(get_codediff_lifecycle, tabpage)
   local lifecycle = get_codediff_lifecycle()

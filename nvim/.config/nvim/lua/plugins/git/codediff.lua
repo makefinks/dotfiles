@@ -135,6 +135,19 @@ return {
       end,
     })
 
+    vim.api.nvim_create_autocmd("User", {
+      group = codediff_group,
+      pattern = "CodeDiffFileSelect",
+      callback = function(args)
+        local tabpage = args.data and args.data.tabpage or vim.api.nvim_get_current_tabpage()
+        vim.schedule(function()
+          if vim.api.nvim_tabpage_is_valid(tabpage) then
+            codediff_view.echo_file_position(tabpage)
+          end
+        end)
+      end,
+    })
+
     require("codediff").setup {
       diff = {
         layout = "side-by-side",

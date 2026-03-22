@@ -4,6 +4,7 @@ return {
 	keys = {
 		-- Remap snacks git branch picker to <leader>gB (<leader>gb is reserved for other git mappings)
 		{ "<Leader>gb", false },
+		{ "<leader>fs", function() Snacks.picker.grep() end, desc = "Grep" },
 		{ "<leader>fw", false },
 		{ "<Leader>gB", function() Snacks.picker.git_branches() end, desc = "Git branches" },
 		{
