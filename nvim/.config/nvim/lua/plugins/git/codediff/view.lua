@@ -24,7 +24,7 @@ local function show_added_file_as_editable(tabpage, explorer, file_data)
 		return false
 	end
 
-	local lifecycle = package.loaded["codediff.ui.lifecycle"]
+	local lifecycle = helpers.get_loaded_module("codediff.ui.lifecycle")
 	if not lifecycle then
 		return false
 	end
@@ -43,8 +43,11 @@ local function show_added_file_as_editable(tabpage, explorer, file_data)
 		end
 
 		if current_session.layout == "inline" then
-			local ok_inline, inline_view = pcall(require, "codediff.ui.view.inline_view")
-			if ok_inline then
+			local inline_view = helpers.require_module("codediff.ui.view.inline_view", nil, {
+				notify = false,
+				functions = "show_single_file",
+			})
+			if inline_view then
 				inline_view.show_single_file(tabpage, abs_path, {
 					side = "modified",
 				})
@@ -52,8 +55,11 @@ local function show_added_file_as_editable(tabpage, explorer, file_data)
 			return
 		end
 
-		local ok_side, side_by_side = pcall(require, "codediff.ui.view.side_by_side")
-		if ok_side then
+		local side_by_side = helpers.require_module("codediff.ui.view.side_by_side", nil, {
+			notify = false,
+			functions = "show_untracked_file",
+		})
+		if side_by_side then
 			side_by_side.show_untracked_file(tabpage, abs_path)
 		end
 	end)
@@ -62,8 +68,11 @@ local function show_added_file_as_editable(tabpage, explorer, file_data)
 end
 
 local function refresh_added_file_after_write(explorer)
-	local ok_refresh, refresh = pcall(require, "codediff.ui.explorer.refresh")
-	if not ok_refresh then
+	local refresh = helpers.require_module("codediff.ui.explorer.refresh", nil, {
+		notify = false,
+		functions = "refresh",
+	})
+	if not refresh then
 		return
 	end
 
@@ -80,7 +89,7 @@ local function ensure_added_file_stays_staged(tabpage, explorer, file_data)
 		return
 	end
 
-	local lifecycle = package.loaded["codediff.ui.lifecycle"]
+	local lifecycle = helpers.get_loaded_module("codediff.ui.lifecycle")
 	if not lifecycle then
 		return
 	end
@@ -95,8 +104,11 @@ local function ensure_added_file_stays_staged(tabpage, explorer, file_data)
 			return
 		end
 
-		local ok_git, git = pcall(require, "codediff.core.git")
-		if not ok_git then
+		local git = helpers.require_module("codediff.core.git", nil, {
+			notify = false,
+			functions = "stage_file",
+		})
+		if not git then
 			return
 		end
 
@@ -126,10 +138,7 @@ local function ensure_added_file_stays_staged(tabpage, explorer, file_data)
 				end
 
 				git.stage_file(current_explorer.git_root, file_data.path, function(err)
-					if err then
-						vim.schedule(function()
-							vim.notify(err, vim.log.levels.ERROR)
-						end)
+					if helpers.handle_async_error(err) then
 						return
 					end
 
@@ -273,7 +282,7 @@ end
 function M.get_file_position(tabpage)
 	tabpage = tabpage or vim.api.nvim_get_current_tabpage()
 
-	local lifecycle = package.loaded["codediff.ui.lifecycle"]
+	local lifecycle = helpers.get_loaded_module("codediff.ui.lifecycle")
 	if not lifecycle then
 		return nil
 	end
@@ -288,8 +297,11 @@ function M.get_file_position(tabpage)
 		return nil
 	end
 
-	local ok_refresh, refresh = pcall(require, "codediff.ui.explorer.refresh")
-	if not ok_refresh or type(refresh.get_all_files) ~= "function" then
+	local refresh = helpers.require_module("codediff.ui.explorer.refresh", nil, {
+		notify = false,
+		functions = "get_all_files",
+	})
+	if not refresh then
 		return nil
 	end
 
@@ -337,9 +349,10 @@ function M.toggle_explorer(get_codediff_lifecycle, tabpage)
 		return
 	end
 
-	local ok, explorer_ui = pcall(require, "codediff.ui.explorer")
-	if not ok then
-		vim.notify("Failed to load codediff explorer", vim.log.levels.ERROR)
+	local explorer_ui = helpers.require_module("codediff.ui.explorer", "Failed to load codediff explorer", {
+		functions = "toggle_visibility",
+	})
+	if not explorer_ui then
 		return
 	end
 
@@ -394,7 +407,7 @@ function M.focus_diff_window(get_codediff_lifecycle, tabpage)
 	return true
 end
 
-function M.select_explorer_file(get_codediff_lifecycle, tabpage, explorer, file_data)
+function M.select_explorer_file(explorer, file_data)
 	if not explorer or not file_data then
 		return
 	end
@@ -434,7 +447,7 @@ function M.open_explorer_entry(get_codediff_lifecycle, tabpage, explorer)
 	local same_selection = explorer.current_file_path == node.data.path
 		and explorer.current_file_group == node.data.group
 	if not same_selection then
-		M.select_explorer_file(get_codediff_lifecycle, tabpage, explorer, node.data)
+		M.select_explorer_file(explorer, node.data)
 	end
 
 	vim.schedule(function()
@@ -443,8 +456,11 @@ function M.open_explorer_entry(get_codediff_lifecycle, tabpage, explorer)
 end
 
 function M.install_refresh_filter()
-	local ok_refresh, refresh = pcall(require, "codediff.ui.explorer.refresh")
-	if not ok_refresh or refresh._user_hide_untracked_installed then
+	local refresh = helpers.require_module("codediff.ui.explorer.refresh", nil, {
+		notify = false,
+		functions = "refresh",
+	})
+	if not refresh or refresh._user_hide_untracked_installed then
 		return
 	end
 
@@ -454,8 +470,11 @@ function M.install_refresh_filter()
 			return original_refresh(explorer, ...)
 		end
 
-		local ok_git, git = pcall(require, "codediff.core.git")
-		if not ok_git or type(git.get_status) ~= "function" then
+		local git = helpers.require_module("codediff.core.git", nil, {
+			notify = false,
+			functions = "get_status",
+		})
+		if not git then
 			return original_refresh(explorer, ...)
 		end
 

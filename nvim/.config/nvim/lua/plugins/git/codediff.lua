@@ -11,13 +11,7 @@ end
 
 -- Safely access the active codediff lifecycle module.
 get_codediff_lifecycle = function()
-	local ok, lifecycle = pcall(require, "codediff.ui.lifecycle")
-	if not ok then
-		vim.notify("Codediff is not available", vim.log.levels.ERROR)
-		return nil
-	end
-
-	return lifecycle
+	return require("plugins.git.codediff.helpers").require_module("codediff.ui.lifecycle", "Codediff is not available")
 end
 
 return {
@@ -154,10 +148,7 @@ return {
 			pattern = "CodeDiffClose",
 			callback = function(args)
 				local tabpage = args.data and args.data.tabpage or vim.api.nvim_get_current_tabpage()
-				modules.keymaps.clear_tab_keymaps(tabpage, get_codediff_lifecycle, {
-					actions = modules.actions,
-					view = modules.view,
-				})
+				modules.keymaps.clear_tab_keymaps(tabpage, get_codediff_lifecycle)
 			end,
 		})
 
