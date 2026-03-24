@@ -114,6 +114,44 @@ describe("local CodeDiff workflow", function()
 		assert.is_not_nil(h.find_tree_entry(explorer, "beta.lua", "staged"))
 	end)
 
+	it("rebinds diff-buffer mappings after staging advances to the next file", function()
+		local actions = require("plugins.git.codediff.actions")
+
+		repo = create_two_modified_files_repo()
+		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+
+		h.wait_for(function()
+			return explorer.current_file_path == "alpha.lua" and explorer.current_file_group == "unstaged"
+		end, 10000, "CodeDiff did not select alpha.lua in the unstaged group")
+
+		local first_modified_bufnr
+		h.wait_for(function()
+			first_modified_bufnr = h.focus_modified_window(tabpage)
+			return h.buffer_has_keymap(first_modified_bufnr, "<leader>gs")
+				and h.buffer_has_keymap(first_modified_bufnr, "ff")
+		end, 10000, "CodeDiff diff-buffer mappings were not ready")
+
+		actions.stage_entry(h.get_codediff_lifecycle, tabpage)
+
+		local second_modified_bufnr
+		h.wait_for(function()
+			local _, bufnr = h.get_codediff_lifecycle().get_buffers(tabpage)
+			second_modified_bufnr = bufnr
+			return explorer.current_file_path == "beta.lua"
+				and explorer.current_file_group == "unstaged"
+				and second_modified_bufnr
+				and vim.api.nvim_buf_is_valid(second_modified_bufnr)
+				and second_modified_bufnr ~= first_modified_bufnr
+				and h.buffer_has_keymap(second_modified_bufnr, "<leader>gs")
+				and h.buffer_has_keymap(second_modified_bufnr, "ff")
+		end, 15000, "Staging did not advance to beta.lua")
+
+		if vim.api.nvim_buf_is_valid(first_modified_bufnr) then
+			assert.is_false(h.buffer_has_keymap(first_modified_bufnr, "<leader>gs"))
+			assert.is_false(h.buffer_has_keymap(first_modified_bufnr, "ff"))
+		end
+	end)
+
 	it("echoes the current CodeDiff file position during navigation", function()
 		repo = create_two_modified_files_repo()
 

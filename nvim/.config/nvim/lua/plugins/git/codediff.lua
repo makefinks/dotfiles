@@ -109,8 +109,13 @@ return {
 	},
 	config = function()
 		local modules = get_codediff_modules()
+		local keymap_deps = {
+			actions = modules.actions,
+			view = modules.view,
+		}
 
 		modules.view.install_refresh_filter()
+		modules.keymaps.install_buffer_update_hook(get_codediff_lifecycle, keymap_deps)
 
 		local codediff_group = vim.api.nvim_create_augroup("user_codediff", { clear = true })
 
@@ -120,10 +125,7 @@ return {
 			callback = function(args)
 				local tabpage = args.data and args.data.tabpage or vim.api.nvim_get_current_tabpage()
 				modules.view.ensure_explorer_window_state(get_codediff_lifecycle, tabpage)
-				modules.keymaps.set_tab_keymaps(tabpage, get_codediff_lifecycle, {
-					actions = modules.actions,
-					view = modules.view,
-				})
+				modules.keymaps.set_tab_keymaps(tabpage, get_codediff_lifecycle, keymap_deps)
 			end,
 		})
 
@@ -134,10 +136,7 @@ return {
 				vim.schedule(function()
 					if vim.api.nvim_tabpage_is_valid(tabpage) then
 						modules.view.ensure_explorer_window_state(get_codediff_lifecycle, tabpage)
-						modules.keymaps.set_tab_keymaps(tabpage, get_codediff_lifecycle, {
-							actions = modules.actions,
-							view = modules.view,
-						})
+						modules.keymaps.set_tab_keymaps(tabpage, get_codediff_lifecycle, keymap_deps)
 					end
 				end)
 			end,
