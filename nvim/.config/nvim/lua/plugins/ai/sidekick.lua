@@ -3,6 +3,15 @@ return {
 	opts = {
 		-- add any options here
 		cli = {
+			win = {
+				keys = {
+					-- Keep <C-p> available for the underlying CLI tool.
+					prompt = false,
+					-- Let the existing terminal navigation own horizontal movement.
+					nav_left = false,
+					nav_right = false,
+				},
+			},
 			mux = {
 				backend = "tmux",
 				enabled = true,
