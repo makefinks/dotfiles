@@ -17,6 +17,7 @@ macos-titlebar-style = native
 
 # remove extra padding from bottom
 window-padding-balance = true
+split-preserve-zoom = navigation
 
 # Enable kitty graphics protocol for image rendering
 image-storage-limit = 500000000
@@ -26,6 +27,8 @@ custom-shader = shaders/cursor_warp.glsl
 custom-shader = shaders/ripple_rectangle_cursor.glsl
 
 # tmux-like leader tab switching (Ctrl+b, then index)
+keybind = ctrl+b>t=goto_split:next
+keybind = ctrl+b>z=toggle_split_zoom
 keybind = ctrl+b>0=goto_tab:1
 keybind = ctrl+b>1=goto_tab:2
 keybind = ctrl+b>2=goto_tab:3
@@ -36,3 +39,12 @@ keybind = ctrl+b>6=goto_tab:7
 keybind = ctrl+b>7=goto_tab:8
 keybind = ctrl+b>8=goto_tab:9
 keybind = ctrl+b>9=goto_tab:10
+
+# Split management for a dedicated Copilot pane.
+keybind = ctrl+b>v=new_split:right
+
+# Larger-step split resizing using Ghostty's default macOS chords.
+keybind = super+ctrl+arrow_left=resize_split:left,30
+keybind = super+ctrl+arrow_down=resize_split:down,30
+keybind = super+ctrl+arrow_up=resize_split:up,30
+keybind = super+ctrl+arrow_right=resize_split:right,30
