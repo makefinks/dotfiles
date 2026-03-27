@@ -19,6 +19,18 @@ local function disable_panel_scrollbind(winid)
 	vim.wo[winid].cursorbind = false
 end
 
+local function path_exists(path)
+	return path and vim.uv.fs_stat(path) ~= nil
+end
+
+local function clamp_cursor_position(bufnr, cursor)
+	local line_count = vim.api.nvim_buf_line_count(bufnr)
+	local line = math.min(math.max(cursor[1], 1), math.max(line_count, 1))
+	local line_text = vim.api.nvim_buf_get_lines(bufnr, line - 1, line, false)[1] or ""
+	local col = math.min(math.max(cursor[2], 0), #line_text)
+	return { line, col }
+end
+
 local function show_added_file_as_editable(tabpage, explorer, file_data)
 	if not explorer or not explorer.git_root or not file_data or file_data.status ~= "A" then
 		return false
@@ -255,6 +267,71 @@ function M.close_view(get_codediff_lifecycle)
 	end
 
 	vim.cmd("tabclose")
+end
+
+function M.open_file_from_diff(get_codediff_lifecycle, tabpage)
+	local lifecycle = get_codediff_lifecycle()
+	if not lifecycle then
+		return
+	end
+
+	tabpage = tabpage or vim.api.nvim_get_current_tabpage()
+
+	local session = lifecycle.get_session(tabpage)
+	if not session or session.mode ~= "explorer" then
+		return
+	end
+
+	local current_buf = vim.api.nvim_get_current_buf()
+	local original_bufnr, modified_bufnr = lifecycle.get_buffers(tabpage)
+	if current_buf ~= original_bufnr and current_buf ~= modified_bufnr then
+		return
+	end
+
+	local explorer = lifecycle.get_explorer(tabpage)
+	local cursor = vim.api.nvim_win_get_cursor(0)
+	local target_path
+
+	if explorer and explorer.git_root and explorer.current_file_path then
+		local repo_path = explorer.git_root .. "/" .. explorer.current_file_path
+		if path_exists(repo_path) then
+			target_path = repo_path
+		end
+	end
+
+	if not target_path then
+		local original_path, modified_path = lifecycle.get_paths(tabpage)
+		local preferred_path = current_buf == modified_bufnr and modified_path or original_path
+		local fallback_path = current_buf == modified_bufnr and original_path or modified_path
+
+		if path_exists(preferred_path) then
+			target_path = preferred_path
+		elseif path_exists(fallback_path) then
+			target_path = fallback_path
+		end
+	end
+
+	if not target_path then
+		vim.notify("No real file is available for this CodeDiff entry", vim.log.levels.WARN)
+		return
+	end
+
+	M.close_view(get_codediff_lifecycle)
+
+	vim.schedule(function()
+		local ok = pcall(vim.cmd.edit, vim.fn.fnameescape(target_path))
+		if not ok then
+			vim.notify(string.format("Failed to open %s", target_path), vim.log.levels.ERROR)
+			return
+		end
+
+		local target_bufnr = vim.api.nvim_get_current_buf()
+		if not vim.api.nvim_buf_is_valid(target_bufnr) then
+			return
+		end
+
+		pcall(vim.api.nvim_win_set_cursor, 0, clamp_cursor_position(target_bufnr, cursor))
+	end)
 end
 
 -- Return the explorer object for the current codediff tab, if one exists.

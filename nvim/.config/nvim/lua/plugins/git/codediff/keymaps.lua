@@ -176,6 +176,10 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 	local original_bufnr, modified_bufnr = lifecycle.get_buffers(tabpage)
 	if session.mode == "explorer" then
 		for _, bufnr in ipairs({ original_bufnr, modified_bufnr }) do
+			set_buffer_keymap(bufnr, "<CR>", function()
+				deps.view.open_file_from_diff(get_codediff_lifecycle, tabpage)
+			end, "Close codediff and open file at cursor")
+
 			set_buffer_keymap(bufnr, "<leader>gs", function()
 				deps.actions.stage_entry(get_codediff_lifecycle, tabpage)
 			end, "Stage current entry")

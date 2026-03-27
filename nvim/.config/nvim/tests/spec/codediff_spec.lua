@@ -152,6 +152,35 @@ describe("local CodeDiff workflow", function()
 		end
 	end)
 
+	it("closes codediff and opens the working tree file at the diff cursor", function()
+		local view = require("plugins.git.codediff.view")
+
+		repo = create_two_modified_files_repo()
+		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+
+		h.wait_for(function()
+			return explorer.current_file_path == "alpha.lua" and explorer.current_file_group == "unstaged"
+		end, 10000, "CodeDiff did not select alpha.lua in the unstaged group")
+
+		local modified_bufnr
+		h.wait_for(function()
+			modified_bufnr = h.focus_modified_window(tabpage)
+			return modified_bufnr
+				and vim.api.nvim_buf_is_valid(modified_bufnr)
+				and h.buffer_has_keymap(modified_bufnr, "<CR>")
+		end, 10000, "CodeDiff diff-buffer enter mapping was not ready")
+
+		vim.api.nvim_win_set_cursor(0, { 1, 0 })
+		view.open_file_from_diff(h.get_codediff_lifecycle, tabpage)
+
+		h.wait_for(function()
+			return vim.api.nvim_buf_get_name(0) == repo.path("alpha.lua")
+		end, 10000, "CodeDiff did not open the working tree file")
+
+		assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
+		assert.is_nil(h.get_codediff_lifecycle().get_session(tabpage))
+	end)
+
 	it("echoes the current CodeDiff file position during navigation", function()
 		repo = create_two_modified_files_repo()
 
