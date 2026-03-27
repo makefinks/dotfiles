@@ -30,7 +30,7 @@ return {
 				modules.view.open_status_explorer(
 					context.repo,
 					context.rel,
-					{ hide_untracked = true },
+					{ hide_untracked = true, focus_diff = true },
 					get_codediff_lifecycle
 				)
 			end,

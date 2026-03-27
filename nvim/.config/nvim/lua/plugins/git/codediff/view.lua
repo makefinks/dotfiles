@@ -235,6 +235,12 @@ function M.open_status_explorer(repo, focus_file, opts, get_codediff_lifecycle)
 			set_explorer_options(get_codediff_lifecycle, tabpage, {
 				hide_untracked = opts.hide_untracked ~= false,
 			})
+
+			if opts.focus_diff then
+				vim.schedule(function()
+					M.focus_diff_window(get_codediff_lifecycle, tabpage)
+				end)
+			end
 		end)
 	end)
 end

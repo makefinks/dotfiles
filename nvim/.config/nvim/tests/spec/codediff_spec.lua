@@ -181,6 +181,26 @@ describe("local CodeDiff workflow", function()
 		assert.is_nil(h.get_codediff_lifecycle().get_session(tabpage))
 	end)
 
+	it("can open the current file with explorer selection and diff focus", function()
+		repo = create_two_modified_files_repo()
+
+		local tabpage, session, explorer = h.open_status_explorer(repo, "alpha.lua", {
+			hide_untracked = true,
+			focus_diff = true,
+		})
+
+		h.wait_for(function()
+			return explorer.current_file_path == "alpha.lua" and explorer.current_file_group == "unstaged"
+		end, 10000, "CodeDiff did not select alpha.lua in the unstaged group")
+
+		h.wait_for(function()
+			return session
+				and session.modified_win
+				and vim.api.nvim_win_is_valid(session.modified_win)
+				and vim.api.nvim_get_current_win() == session.modified_win
+		end, 10000, "CodeDiff did not focus the modified diff window")
+	end)
+
 	it("echoes the current CodeDiff file position during navigation", function()
 		repo = create_two_modified_files_repo()
 
