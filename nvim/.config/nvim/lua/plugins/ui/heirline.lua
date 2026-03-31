@@ -17,7 +17,7 @@ return {
           },
           -- surround the component with a separators
           surround = {
-            separator = "right",
+            separator = "left",
             -- set the color of the surrounding based on the current mode using astronvim.utils.status module
             color = function() return { main = status.hl.mode_bg(), right = "blank_bg" } end,
           },
