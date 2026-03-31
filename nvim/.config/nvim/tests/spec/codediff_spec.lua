@@ -127,7 +127,7 @@ describe("local CodeDiff workflow", function()
 		local first_modified_bufnr
 		h.wait_for(function()
 			first_modified_bufnr = h.focus_modified_window(tabpage)
-			return h.buffer_has_keymap(first_modified_bufnr, "<leader>gs")
+			return h.buffer_has_keymap(first_modified_bufnr, "<leader>gz")
 				and h.buffer_has_keymap(first_modified_bufnr, "ff")
 		end, 10000, "CodeDiff diff-buffer mappings were not ready")
 
@@ -142,12 +142,12 @@ describe("local CodeDiff workflow", function()
 				and second_modified_bufnr
 				and vim.api.nvim_buf_is_valid(second_modified_bufnr)
 				and second_modified_bufnr ~= first_modified_bufnr
-				and h.buffer_has_keymap(second_modified_bufnr, "<leader>gs")
+				and h.buffer_has_keymap(second_modified_bufnr, "<leader>gz")
 				and h.buffer_has_keymap(second_modified_bufnr, "ff")
 		end, 15000, "Staging did not advance to beta.lua")
 
 		if vim.api.nvim_buf_is_valid(first_modified_bufnr) then
-			assert.is_false(h.buffer_has_keymap(first_modified_bufnr, "<leader>gs"))
+			assert.is_false(h.buffer_has_keymap(first_modified_bufnr, "<leader>gz"))
 			assert.is_false(h.buffer_has_keymap(first_modified_bufnr, "ff"))
 		end
 	end)

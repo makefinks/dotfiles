@@ -3,7 +3,7 @@ local M = {}
 local helpers = require("plugins.git.codediff.helpers")
 
 local custom_codediff_keymaps =
-	{ "<CR>", "<Tab>", "<S-Tab>", "<C-q>", "ff", "<leader>e", "<leader>gs", "<leader>gu", "<leader>gx", "s", "u", "x" }
+	{ "<CR>", "<Tab>", "<S-Tab>", "<C-q>", "ff", "<leader>e", "<leader>gz", "<leader>gu", "<leader>gx", "s", "u", "x" }
 local tracked_keymap_buffers = {}
 
 local function clear_buffer_keymaps(bufnr)
@@ -180,7 +180,7 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 				deps.view.open_file_from_diff(get_codediff_lifecycle, tabpage)
 			end, "Close codediff and open file at cursor")
 
-			set_buffer_keymap(bufnr, "<leader>gs", function()
+			set_buffer_keymap(bufnr, "<leader>gz", function()
 				deps.actions.stage_entry(get_codediff_lifecycle, tabpage)
 			end, "Stage current entry")
 
@@ -218,7 +218,7 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 			end, "Previous codediff file")
 		end
 
-		set_buffer_keymap(explorer.bufnr, "<leader>gs", function()
+		set_buffer_keymap(explorer.bufnr, "<leader>gz", function()
 			deps.actions.toggle_stage(get_codediff_lifecycle, tabpage)
 		end, "Stage/unstage current entry")
 

@@ -15,8 +15,6 @@ return {
       "tsx",
       "json",
       "yaml",
-      "markdown",
-      "markdown_inline",
       "bash",
       "html",
       "css",

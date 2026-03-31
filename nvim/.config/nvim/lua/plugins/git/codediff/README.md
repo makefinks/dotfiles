@@ -37,7 +37,7 @@ Explorer defaults:
 
 Git actions:
 
-- `gitsigns` stage mappings are removed so codediff owns `<leader>gs`
+- `gitsigns` stage mappings are removed so codediff owns `<leader>gz`
 - explorer and diff buffers both support stage, unstage, and discard actions
 - when codediff opens, one representative file per LSP/root pair is loaded in the background
 - those temporary buffers are deleted when the codediff tab closes
@@ -53,7 +53,7 @@ Inside codediff tabs:
 
 - `<leader>e`: toggle explorer
 - `ff`: picker for all files currently in the explorer
-- `<leader>gs`: toggle stage / unstage current entry
+- `<leader>gz`: toggle stage / unstage current entry
 - `<leader>gx`: discard current entry
 - `<C-q>`: close codediff
 - `s`: stage current entry
