@@ -1,0 +1,6 @@
+[project]
+name = "agent-ty-project"
+version = "0.1.0"
+
+[tool.ty]
+environment = "./.venv"
