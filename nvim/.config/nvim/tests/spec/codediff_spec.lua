@@ -31,6 +31,29 @@ local function create_staged_added_file_repo()
 	return repo
 end
 
+local function create_multiline_modified_files_repo()
+	repo = h.create_temp_git_repo()
+	repo.write_file("alpha.lua", {
+		"local alpha = {",
+		"  value = 'alpha',",
+		"}",
+		"",
+		"return alpha",
+	})
+	repo.write_file("beta.lua", { "return 'beta'" })
+	repo.git_ok({ "add", "." })
+	repo.git_ok({ "commit", "-m", "initial" })
+	repo.write_file("alpha.lua", {
+		"local alpha = {",
+		"  value = 'alpha modified',",
+		"}",
+		"",
+		"return alpha",
+	})
+	repo.write_file("beta.lua", { "return 'beta modified'" })
+	return repo
+end
+
 describe("local CodeDiff workflow", function()
 	before_each(function()
 		original_cwd = vim.fn.getcwd()
@@ -179,6 +202,71 @@ describe("local CodeDiff workflow", function()
 
 		assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
 		assert.is_nil(h.get_codediff_lifecycle().get_session(tabpage))
+	end)
+
+	it("resumes the last codediff session at the saved diff cursor", function()
+		local view = require("plugins.git.codediff.view")
+		local lifecycle = h.get_codediff_lifecycle()
+
+		repo = create_multiline_modified_files_repo()
+		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+
+		h.wait_for(function()
+			return explorer.current_file_path == "alpha.lua" and explorer.current_file_group == "unstaged"
+		end, 10000, "CodeDiff did not select alpha.lua in the unstaged group")
+
+		local modified_bufnr
+		h.wait_for(function()
+			modified_bufnr = h.focus_modified_window(tabpage)
+			return modified_bufnr
+				and vim.api.nvim_buf_is_valid(modified_bufnr)
+				and vim.api.nvim_buf_line_count(modified_bufnr) >= 2
+				and h.buffer_has_keymap(modified_bufnr, "<CR>")
+		end, 10000, "CodeDiff diff-buffer enter mapping was not ready")
+
+		vim.api.nvim_win_set_cursor(0, { 2, 2 })
+		view.open_file_from_diff(h.get_codediff_lifecycle, tabpage)
+
+		h.wait_for(function()
+			return vim.api.nvim_buf_get_name(0) == repo.path("alpha.lua")
+		end, 10000, "CodeDiff did not open the working tree file")
+
+		view.resume_last_session(h.get_codediff_lifecycle)
+
+		local resumed_tabpage
+		local resumed_session
+		local resumed_explorer
+		h.wait_for(function()
+			for _, tp in ipairs(vim.api.nvim_list_tabpages()) do
+				local session = lifecycle.get_session(tp)
+				local current_explorer = lifecycle.get_explorer(tp)
+				if
+					session
+					and current_explorer
+					and session.mode == "explorer"
+					and current_explorer.current_file_path == "alpha.lua"
+					and current_explorer.current_file_group == "unstaged"
+				then
+					resumed_tabpage = tp
+					resumed_session = session
+					resumed_explorer = current_explorer
+					return true
+				end
+			end
+
+			return false
+		end, 15000, "CodeDiff did not reopen the saved session")
+
+		h.wait_for(function()
+			return resumed_session
+				and resumed_session.modified_win
+				and vim.api.nvim_win_is_valid(resumed_session.modified_win)
+				and vim.api.nvim_get_current_win() == resumed_session.modified_win
+				and vim.deep_equal(vim.api.nvim_win_get_cursor(resumed_session.modified_win), { 2, 2 })
+		end, 15000, "CodeDiff did not restore the saved diff cursor")
+
+		assert.is_not_nil(resumed_tabpage)
+		assert.is_not_nil(resumed_explorer)
 	end)
 
 	it("can open the current file with explorer selection and diff focus", function()

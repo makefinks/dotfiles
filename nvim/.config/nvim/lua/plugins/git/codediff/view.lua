@@ -2,6 +2,8 @@ local M = {}
 
 local helpers = require("plugins.git.codediff.helpers")
 
+local last_resume_snapshot = nil
+
 local function get_explorer_winid(explorer)
 	if not explorer then
 		return nil
@@ -29,6 +31,117 @@ local function clamp_cursor_position(bufnr, cursor)
 	local line_text = vim.api.nvim_buf_get_lines(bufnr, line - 1, line, false)[1] or ""
 	local col = math.min(math.max(cursor[2], 0), #line_text)
 	return { line, col }
+end
+
+local function find_status_entry(status_result, file_path, preferred_group)
+	if not status_result or not file_path then
+		return nil
+	end
+
+	local search_order = {}
+	if preferred_group then
+		search_order[#search_order + 1] = preferred_group
+	end
+
+	for _, group in ipairs({ "conflicts", "unstaged", "staged" }) do
+		if group ~= preferred_group then
+			search_order[#search_order + 1] = group
+		end
+	end
+
+	for _, group in ipairs(search_order) do
+		for _, entry in ipairs(status_result[group] or {}) do
+			if entry.path == file_path then
+				return vim.deepcopy(vim.tbl_extend("force", entry, { group = group }))
+			end
+		end
+	end
+
+	return nil
+end
+
+local function capture_resume_snapshot(session, explorer, cursor)
+	if not session or session.mode ~= "explorer" or not explorer or not explorer.git_root then
+		return
+	end
+
+	local file_path = explorer.current_file_path
+	local group = explorer.current_file_group
+	if not file_path or not group then
+		return
+	end
+
+	last_resume_snapshot = {
+		repo = explorer.git_root,
+		file_path = file_path,
+		group = group,
+		cursor = vim.deepcopy(cursor),
+		hide_untracked = session.hide_untracked ~= false,
+		explorer_hidden = explorer.is_hidden or false,
+	}
+end
+
+local function apply_resume_snapshot(get_codediff_lifecycle, snapshot, attempt)
+	attempt = attempt or 1
+	local max_attempts = 80
+	local lifecycle = get_codediff_lifecycle()
+	if not lifecycle then
+		return
+	end
+
+	local tabpage = vim.api.nvim_get_current_tabpage()
+	local session = lifecycle.get_session(tabpage)
+	local explorer = lifecycle.get_explorer(tabpage)
+	if not session or not explorer or session.mode ~= "explorer" then
+		if attempt >= max_attempts then
+			return
+		end
+
+		vim.defer_fn(function()
+			apply_resume_snapshot(get_codediff_lifecycle, snapshot, attempt + 1)
+		end, 50)
+		return
+	end
+
+	local selection = find_status_entry(explorer.status_result, snapshot.file_path, snapshot.group)
+	if selection then
+		M.select_explorer_file(explorer, selection)
+	end
+
+	vim.defer_fn(function()
+		local current_lifecycle = get_codediff_lifecycle()
+		if not current_lifecycle then
+			return
+		end
+
+		local current_tabpage = vim.api.nvim_get_current_tabpage()
+		local current_session = current_lifecycle.get_session(current_tabpage)
+		local current_explorer = current_lifecycle.get_explorer(current_tabpage)
+		if not current_session or not current_explorer or current_session.mode ~= "explorer" then
+			return
+		end
+
+		if snapshot.explorer_hidden and not current_explorer.is_hidden then
+			M.toggle_explorer(get_codediff_lifecycle, current_tabpage)
+		end
+
+		if not M.focus_diff_window(get_codediff_lifecycle, current_tabpage) then
+			return
+		end
+
+		local current_win = vim.api.nvim_get_current_win()
+		if not vim.api.nvim_win_is_valid(current_win) then
+			return
+		end
+
+		local current_bufnr = vim.api.nvim_win_get_buf(current_win)
+		if not (current_bufnr and vim.api.nvim_buf_is_valid(current_bufnr)) then
+			return
+		end
+
+		pcall(vim.api.nvim_win_set_cursor, current_win, clamp_cursor_position(current_bufnr, snapshot.cursor))
+		last_resume_snapshot = snapshot
+	end, 80)
 end
 
 local function show_added_file_as_editable(tabpage, explorer, file_data)
@@ -322,6 +435,8 @@ function M.open_file_from_diff(get_codediff_lifecycle, tabpage)
 		return
 	end
 
+	capture_resume_snapshot(session, explorer, cursor)
+
 	M.close_view(get_codediff_lifecycle)
 
 	vim.schedule(function()
@@ -338,6 +453,28 @@ function M.open_file_from_diff(get_codediff_lifecycle, tabpage)
 
 		pcall(vim.api.nvim_win_set_cursor, 0, clamp_cursor_position(target_bufnr, cursor))
 	end)
+end
+
+function M.resume_last_session(get_codediff_lifecycle)
+	local snapshot = last_resume_snapshot
+	if not snapshot then
+		vim.notify("No previous CodeDiff session to resume", vim.log.levels.WARN)
+		return
+	end
+
+	if not path_exists(snapshot.repo) then
+		vim.notify(string.format("CodeDiff repo is no longer available: %s", snapshot.repo), vim.log.levels.WARN)
+		return
+	end
+
+	M.open_status_explorer(snapshot.repo, snapshot.file_path, {
+		hide_untracked = snapshot.hide_untracked,
+		focus_diff = true,
+	}, get_codediff_lifecycle)
+
+	vim.defer_fn(function()
+		apply_resume_snapshot(get_codediff_lifecycle, snapshot)
+	end, 80)
 end
 
 -- Return the explorer object for the current codediff tab, if one exists.

@@ -70,6 +70,13 @@ return {
 			desc = "Close codediff",
 		},
 		{
+			"<leader>g<CR>",
+			function()
+				get_codediff_modules().view.resume_last_session(get_codediff_lifecycle)
+			end,
+			desc = "Resume codediff",
+		},
+		{
 			"<leader>gF",
 			function()
 				local modules = get_codediff_modules()
