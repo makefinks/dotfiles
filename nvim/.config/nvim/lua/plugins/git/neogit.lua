@@ -29,6 +29,8 @@ return {
 		local function set_neogit_diff_colors()
 			vim.api.nvim_set_hl(0, "NeogitDiffAddHighlight", { fg = "#5a9dc7", bg = "#2a3f4d" })
 			vim.api.nvim_set_hl(0, "NeogitDiffDeleteHighlight", { fg = "#cc0000", bg = "#4d2a2a" })
+			vim.api.nvim_set_hl(0, "NeogitDiffAddInline", { fg = "#7fb6d8", bg = "#365261", bold = true })
+			vim.api.nvim_set_hl(0, "NeogitDiffDeleteInline", { fg = "#f08a8a", bg = "#633838", bold = true })
 		end
 
 		set_neogit_diff_colors()
