@@ -41,6 +41,9 @@ end
 opt.rtp:prepend(lazypath)
 
 pcall(require, "lazy_setup")
+pcall(function()
+	require("utils.treesitter_parser").prefer_core_builtin_parsers()
+end)
 pcall(require, "polish")
 
 -- clipboard integration

@@ -2,6 +2,7 @@
 
 This neovim config is used by me and designed to work across WSL (Ubuntu) / and MacOS (and probably on most linux distros).
 The purpose is to have single configuration that can be used at home and work with a toggle for certain plugins/features.
+Built for Neovim >= 0.12.0.
 
 The goal is to have fast and functional but also asthetically pleasing setup.
 

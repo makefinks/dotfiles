@@ -40,9 +40,12 @@ return {
 		servers = {
 			"ty",
 		},
-		-- customize language server configuration options passed to `lspconfig`
+		-- customize language server configuration options passed to `vim.lsp.config`
 		---@diagnostic disable: missing-fields
 		config = {
+			["*"] = {
+				capabilities = vim.lsp.protocol.make_client_capabilities(),
+			},
 			-- basedpyright = {
 			--   settings = {
 			--     basedpyright = {
@@ -55,10 +58,18 @@ return {
 			ty = {
 				cmd = { "ty", "server" },
 				filetypes = { "python" },
-				root_dir = function(fname)
-					local util = require("lspconfig.util")
-					-- Mirror basedpyright root detection, with ty.toml preferred when present.
-					return util.root_pattern(
+				root_markers = {
+					"ty.toml",
+					"pyproject.toml",
+					"setup.py",
+					"setup.cfg",
+					"requirements.txt",
+					"Pipfile",
+					"pyrightconfig.json",
+					".git",
+				},
+				root_dir = function(bufnr, on_dir)
+					on_dir(vim.fs.root(bufnr, {
 						"ty.toml",
 						"pyproject.toml",
 						"setup.py",
@@ -66,8 +77,8 @@ return {
 						"requirements.txt",
 						"Pipfile",
 						"pyrightconfig.json",
-						".git"
-					)(fname)
+						".git",
+					}))
 				end,
 				single_file_support = true,
 			},
@@ -75,12 +86,11 @@ return {
 		},
 		-- customize how language servers are attached
 		handlers = {
-			-- a function without a key is simply the default handler, functions take two parameters, the server name and the configured options table for that server
-			-- function(server, opts) require("lspconfig")[server].setup(opts) end
+			-- a function with the key `*` modifies the default handler, functions take the server name
+			-- ["*"] = function(server) vim.lsp.enable(server) end
 
-			-- the key is the server that is being setup with `lspconfig`
+			-- the key is the server that is being setup with `vim.lsp.config`
 			-- rust_analyzer = false, -- setting a handler to false will disable the set up of that language server
-			-- pyright = function(_, opts) require("lspconfig").pyright.setup(opts) end -- or a custom handler function can be passed
 		},
 		-- Configure buffer local auto commands to add when attaching a language server
 		autocmds = {
@@ -123,14 +133,14 @@ return {
 					end,
 					desc = "Toggle LSP semantic highlight (buffer)",
 					cond = function(client)
-						return client.supports_method("textDocument/semanticTokens/full")
+						return client:supports_method("textDocument/semanticTokens/full")
 							and vim.lsp.semantic_tokens ~= nil
 					end,
 				},
 			},
 		},
 		-- A custom `on_attach` function to be run after the default `on_attach` function
-		-- takes two parameters `client` and `bufnr`  (`:h lspconfig-setup`)
+		-- takes two parameters `client` and `bufnr`  (`:h lsp-attach`)
 		on_attach = function(client, bufnr)
 			-- this would disable semanticTokensProvider for all clients
 			-- client.server_capabilities.semanticTokensProvider = nil

@@ -1,5 +1,10 @@
 ---@type LazySpec
 return {
+	{
+		"mason-org/mason-lspconfig.nvim",
+		commit = "037398b9ce4a53ba48d5f94765c641a1fd16d906",
+	},
+	
 	-- use mason-tool-installer for automatically installing Mason packages
 	{
 		"WhoIsSethDaniel/mason-tool-installer.nvim",

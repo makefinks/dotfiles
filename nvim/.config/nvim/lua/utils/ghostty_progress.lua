@@ -85,6 +85,7 @@ local function handle_echo_progress(ev)
 		progress_ids[key] = vim.api.nvim_echo({ { message } }, false, {
 			id = progress_ids[key],
 			kind = "progress",
+			source = title,
 			title = title,
 			status = status,
 			percent = value.percentage,

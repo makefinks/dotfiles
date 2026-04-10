@@ -1,5 +1,5 @@
 return {
-	"Saghen/blink.cmp",
+	"saghen/blink.cmp",
 	event = "VeryLazy",
 	opts = {
 		signature = {
