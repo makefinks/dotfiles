@@ -3,6 +3,34 @@
 -- NOTE: We highly recommend setting up the Lua Language Server (`:LspInstall lua_ls`)
 --       as this provides autocomplete and documentation while editing
 
+---Resolve the current relative path, including the selected Neo-tree node.
+local function get_current_path()
+	if vim.bo.filetype == "neo-tree" then
+		-- Neo-tree uses a synthetic buffer name, so read the selected node instead.
+		local ok, manager = pcall(require, "neo-tree.sources.manager")
+		if ok then
+			local state = manager.get_state_for_window()
+			local node = state and state.tree and state.tree:get_node() or nil
+			local node_path = node and node:get_id() or nil
+			if node_path and node_path ~= "" then
+				return vim.fn.fnamemodify(node_path, ":.")
+			end
+		end
+	end
+
+	return vim.fn.expand("%:.")
+end
+
+local function yank_path(path, title)
+	if path == nil or path == "" then
+		return
+	end
+
+	vim.fn.setreg("+", path)
+	vim.fn.setreg('"', path)
+	Snacks.notifier.notify("Copied: " .. path, "info", { title = title })
+end
+
 ---@type LazySpec
 return {
 	"AstroNvim/astrocore",
@@ -92,10 +120,7 @@ return {
 				["<C-i>"] = { "<C-i>zz", desc = "Jump forward (centered)" },
 				["<Leader>yp"] = {
 					function()
-						local path = vim.fn.expand("%:.")
-						vim.fn.setreg("+", path)
-						vim.fn.setreg('"', path)
-						Snacks.notifier.notify("Copied: " .. path, "info", { title = "Path" })
+						yank_path(get_current_path(), "Path")
 					end,
 					desc = "Yank relative file path",
 				},
@@ -103,15 +128,16 @@ return {
 			x = {
 				["<Leader>yp"] = {
 					function()
-						local path = vim.fn.expand("%:.")
+						local path = get_current_path()
+						if path == nil or path == "" then
+							return
+						end
 						local start_line = vim.fn.line("v")
 						local end_line = vim.api.nvim_win_get_cursor(0)[1]
 						local from_line = math.min(start_line, end_line)
 						local to_line = math.max(start_line, end_line)
 						local selection = string.format("%s:%d:%d", path, from_line, to_line)
-						vim.fn.setreg("+", selection)
-						vim.fn.setreg('"', selection)
-						Snacks.notifier.notify("Copied: " .. selection, "info", { title = "Path + Lines" })
+						yank_path(selection, "Path + Lines")
 					end,
 					desc = "Yank relative file path with selected line range",
 				},
