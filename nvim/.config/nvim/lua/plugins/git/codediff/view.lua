@@ -452,6 +452,7 @@ function M.open_file_from_diff(get_codediff_lifecycle, tabpage)
 		end
 
 		pcall(vim.api.nvim_win_set_cursor, 0, clamp_cursor_position(target_bufnr, cursor))
+		pcall(vim.cmd.normal, { args = { "zz" }, bang = true })
 	end)
 end
 
