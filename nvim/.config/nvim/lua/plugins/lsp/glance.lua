@@ -6,6 +6,7 @@ return {
 		{ "gT", "<CMD>Glance type_definitions<CR>", desc = "LSP type definitions (Glance)" },
 	},
 	opts = {
+		height = 25,
 		border = {
 			enable = true,
 		},
