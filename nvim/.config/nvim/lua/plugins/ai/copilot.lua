@@ -4,6 +4,9 @@ return {
 	lazy = true,
 	event = "InsertEnter", -- Load only on typing
 	opts = {
+		filetypes = {
+			markdown = true,
+		},
 		suggestion = {
 			enabled = true,
 			auto_trigger = true,
