@@ -3,6 +3,7 @@ local M = {}
 local helpers = require("plugins.git.codediff.helpers")
 
 local last_resume_snapshot = nil
+local statusline_state_by_tabpage = {}
 
 local function get_explorer_winid(explorer)
 	if not explorer then
@@ -47,6 +48,48 @@ local function format_marker_progress(current, total)
 		current,
 		total
 	)
+end
+
+local function get_statusline_tabpage(tabpage)
+	if tabpage and vim.api.nvim_tabpage_is_valid(tabpage) then
+		return tabpage
+	end
+
+	local winid = vim.g.statusline_winid
+	if winid and vim.api.nvim_win_is_valid(winid) then
+		return vim.api.nvim_win_get_tabpage(winid)
+	end
+
+	return vim.api.nvim_get_current_tabpage()
+end
+
+local function get_explorer_file_position(explorer)
+	if not explorer or not explorer.tree or not explorer.current_file_path or not explorer.current_file_group then
+		return nil
+	end
+
+	local refresh = helpers.require_module("codediff.ui.explorer.refresh", nil, {
+		notify = false,
+		functions = "get_all_files",
+	})
+	if not refresh then
+		return nil
+	end
+
+	local files = refresh.get_all_files(explorer.tree)
+	local total = #files
+	if total == 0 then
+		return nil
+	end
+
+	for i, file in ipairs(files) do
+		local data = file.data
+		if data and data.path == explorer.current_file_path and data.group == explorer.current_file_group then
+			return i, total
+		end
+	end
+
+	return nil
 end
 
 local function find_status_entry(status_result, file_path, preferred_group)
@@ -293,33 +336,7 @@ local function ensure_added_file_stays_staged(tabpage, explorer, file_data)
 end
 
 local function get_statusline_file_progress(explorer)
-	if not explorer or not explorer.tree or not explorer.current_file_path or not explorer.current_file_group then
-		return nil
-	end
-
-	local refresh = helpers.require_module("codediff.ui.explorer.refresh", nil, {
-		notify = false,
-		functions = "get_all_files",
-	})
-	if not refresh then
-		return nil
-	end
-
-	local files = refresh.get_all_files(explorer.tree)
-	local total = #files
-	if total == 0 then
-		return nil
-	end
-
-	local current_index = nil
-	for i, file in ipairs(files) do
-		local data = file.data
-		if data and data.path == explorer.current_file_path and data.group == explorer.current_file_group then
-			current_index = i
-			break
-		end
-	end
-
+	local current_index, total = get_explorer_file_position(explorer)
 	return current_index and format_marker_progress(current_index, total) or nil
 end
 
@@ -334,10 +351,16 @@ local function set_statusline_filename(tabpage, explorer, file_data)
 		return
 	end
 
-	vim.schedule(function()
+	local function apply_statusline_values()
 		local original_bufnr, modified_bufnr = lifecycle.get_buffers(tabpage)
 		local filename = vim.fn.fnamemodify(file_path, ":t")
 		local progress = get_statusline_file_progress(explorer)
+		local current_state = statusline_state_by_tabpage[tabpage]
+		statusline_state_by_tabpage[tabpage] = {
+			name = filename,
+			progress = progress,
+			hunk_progress = current_state and current_state.hunk_progress or nil,
+		}
 
 		for _, bufnr in ipairs({ original_bufnr, modified_bufnr, explorer.bufnr }) do
 			if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
@@ -347,7 +370,29 @@ local function set_statusline_filename(tabpage, explorer, file_data)
 		end
 
 		vim.cmd.redrawstatus()
+	end
+
+	apply_statusline_values()
+
+	vim.schedule(function()
+		apply_statusline_values()
 	end)
+end
+
+function M.get_statusline_state(tabpage)
+	tabpage = get_statusline_tabpage(tabpage)
+	if not tabpage or not vim.api.nvim_tabpage_is_valid(tabpage) then
+		return nil
+	end
+
+	return statusline_state_by_tabpage[tabpage]
+end
+
+function M.clear_statusline_state(tabpage)
+	tabpage = get_statusline_tabpage(tabpage)
+	if tabpage then
+		statusline_state_by_tabpage[tabpage] = nil
+	end
 end
 
 local function ensure_editable_added_file_override(tabpage, explorer)
@@ -357,9 +402,9 @@ local function ensure_editable_added_file_override(tabpage, explorer)
 
 	local original_on_file_select = explorer.on_file_select
 	explorer.on_file_select = function(file_data, opts)
+		set_statusline_filename(tabpage, explorer, file_data)
 		original_on_file_select(file_data, opts)
 
-		set_statusline_filename(tabpage, explorer, file_data)
 		show_added_file_as_editable(tabpage, explorer, file_data)
 		ensure_added_file_stays_staged(tabpage, explorer, file_data)
 	end
@@ -590,34 +635,8 @@ function M.get_file_position(tabpage)
 	end
 
 	local explorer = lifecycle.get_explorer(tabpage)
-	if not explorer or not explorer.tree or not explorer.current_file_path or not explorer.current_file_group then
-		return nil
-	end
-
-	local refresh = helpers.require_module("codediff.ui.explorer.refresh", nil, {
-		notify = false,
-		functions = "get_all_files",
-	})
-	if not refresh then
-		return nil
-	end
-
-	local files = refresh.get_all_files(explorer.tree)
-	local total = #files
-	if total == 0 then
-		return nil
-	end
-
-	local current_index = nil
-	for i, file in ipairs(files) do
-		local data = file.data
-		if data and data.path == explorer.current_file_path and data.group == explorer.current_file_group then
-			current_index = i
-			break
-		end
-	end
-
-	if not current_index then
+	local current_index, total = get_explorer_file_position(explorer)
+	if not current_index or not total then
 		return nil
 	end
 
@@ -681,6 +700,21 @@ function M.get_hunk_progress(tabpage)
 	end
 
 	return format_marker_progress(current_index, #changes)
+end
+
+function M.get_statusline_hunk_progress(tabpage)
+	tabpage = get_statusline_tabpage(tabpage)
+	local state = tabpage and statusline_state_by_tabpage[tabpage] or nil
+	local progress = M.get_hunk_progress(tabpage)
+	if progress then
+		if state then
+			state.hunk_progress = progress
+		end
+
+		return progress
+	end
+
+	return state and state.hunk_progress or nil
 end
 
 -- Hide/show the explorer while keeping the active diff windows usable.

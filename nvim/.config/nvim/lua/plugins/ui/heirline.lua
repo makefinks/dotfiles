@@ -4,12 +4,27 @@ return {
 		opts = function(_, opts)
 			local status = require("astroui.status")
 
+			local function codediff_view()
+				return package.loaded["plugins.git.codediff.view"]
+			end
+
+			local function codediff_statusline_state()
+				local view = codediff_view()
+				return view and view.get_statusline_state and view.get_statusline_state() or nil
+			end
+
+			local function codediff_statusline_progress()
+				local state = codediff_statusline_state()
+				return state and state.progress or vim.b.codediff_status_progress
+			end
+
 			local function not_codediff()
-				return vim.b.codediff_status_progress == nil
+				return codediff_statusline_progress() == nil
 			end
 
 			local function hunk_progress()
-				return require("plugins.git.codediff.view").get_hunk_progress()
+				local view = codediff_view()
+				return view and view.get_statusline_hunk_progress and view.get_statusline_hunk_progress() or nil
 			end
 
 			opts.statusline = {
@@ -48,7 +63,10 @@ return {
 					filename = {
 						fname = function(nr)
 							local bufnr = nr and vim.api.nvim_buf_is_valid(nr) and nr or vim.api.nvim_get_current_buf()
-							return vim.b[bufnr].codediff_status_name or vim.api.nvim_buf_get_name(bufnr)
+							local state = codediff_statusline_state()
+							return vim.b[bufnr].codediff_status_name
+								or state and state.name
+								or vim.api.nvim_buf_get_name(bufnr)
 						end,
 						fallback = "Empty",
 					},
@@ -162,15 +180,16 @@ return {
 					{
 						provider = function()
 							local hunk = hunk_progress()
+							local progress = codediff_statusline_progress()
 							if hunk then
-								return string.format("File %s  Hunk %s", vim.b.codediff_status_progress, hunk)
+								return string.format("File %s  Hunk %s", progress, hunk)
 							end
 
-							return "File " .. vim.b.codediff_status_progress
+							return "File " .. progress
 						end,
 					},
 					condition = function()
-						return vim.b.codediff_status_progress ~= nil
+						return codediff_statusline_progress() ~= nil
 					end,
 					surround = { separator = "none", color = "bg" },
 				}),

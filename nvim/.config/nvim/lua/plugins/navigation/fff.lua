@@ -1,5 +1,6 @@
 return {
 	"dmtrKovalenko/fff.nvim",
+	-- Temporary review marker: unrelated plugin spec comment.
 	enabled = require("toggles").enabled("fff"),
 	cmd = {
 		"FFFFind",

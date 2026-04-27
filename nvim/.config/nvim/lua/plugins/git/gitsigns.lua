@@ -1,5 +1,6 @@
 return {
 	"lewis6991/gitsigns.nvim",
+	-- Temporary review marker: git plugin spec comment.
 	opts = function(_, opts)
 		-- Remove gitsigns hunk-stage mappings so codediff can own <leader>gs for whole-buffer staging.
 		if opts.on_attach then
