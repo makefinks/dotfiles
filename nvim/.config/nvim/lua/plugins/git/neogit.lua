@@ -24,6 +24,10 @@ return {
 			},
 			-- Use codediff as the diff viewer instead of the old diffview setup.
 			diff_viewer = "codediff",
+			commit_editor = {
+				show_staged_diff = false,
+				spell_check = true,
+			},
 		})
 
 		local function set_neogit_diff_colors()
