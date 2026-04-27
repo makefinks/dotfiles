@@ -33,6 +33,22 @@ local function clamp_cursor_position(bufnr, cursor)
 	return { line, col }
 end
 
+local function format_marker_progress(current, total)
+	local width = 8
+	if total == 1 then
+		return string.format("%s %d/%d", string.rep("█", width), current, total)
+	end
+
+	local marker = 1 + math.floor((current - 1) / (total - 1) * (width - 1))
+	return string.format(
+		"%s█%s %d/%d",
+		string.rep("░", marker - 1),
+		string.rep("░", width - marker),
+		current,
+		total
+	)
+end
+
 local function find_status_entry(status_result, file_path, preferred_group)
 	if not status_result or not file_path then
 		return nil
@@ -79,30 +95,6 @@ local function capture_resume_snapshot(session, explorer, cursor)
 		hide_untracked = session.hide_untracked ~= false,
 		explorer_hidden = explorer.is_hidden or false,
 	}
-end
-
-local function capture_current_resume_snapshot(lifecycle, tabpage)
-	local session = lifecycle.get_session(tabpage)
-	if not session or session.mode ~= "explorer" then
-		return
-	end
-
-	local explorer = lifecycle.get_explorer(tabpage)
-	local original_bufnr, modified_bufnr = lifecycle.get_buffers(tabpage)
-	local current_buf = vim.api.nvim_get_current_buf()
-	local cursor
-
-	if current_buf == original_bufnr or current_buf == modified_bufnr then
-		cursor = vim.api.nvim_win_get_cursor(0)
-	elseif session.modified_win and vim.api.nvim_win_is_valid(session.modified_win) then
-		cursor = vim.api.nvim_win_get_cursor(session.modified_win)
-	elseif session.original_win and vim.api.nvim_win_is_valid(session.original_win) then
-		cursor = vim.api.nvim_win_get_cursor(session.original_win)
-	end
-
-	if cursor then
-		capture_resume_snapshot(session, explorer, cursor)
-	end
 end
 
 local function apply_resume_snapshot(get_codediff_lifecycle, snapshot, attempt)
@@ -300,6 +292,64 @@ local function ensure_added_file_stays_staged(tabpage, explorer, file_data)
 	end)
 end
 
+local function get_statusline_file_progress(explorer)
+	if not explorer or not explorer.tree or not explorer.current_file_path or not explorer.current_file_group then
+		return nil
+	end
+
+	local refresh = helpers.require_module("codediff.ui.explorer.refresh", nil, {
+		notify = false,
+		functions = "get_all_files",
+	})
+	if not refresh then
+		return nil
+	end
+
+	local files = refresh.get_all_files(explorer.tree)
+	local total = #files
+	if total == 0 then
+		return nil
+	end
+
+	local current_index = nil
+	for i, file in ipairs(files) do
+		local data = file.data
+		if data and data.path == explorer.current_file_path and data.group == explorer.current_file_group then
+			current_index = i
+			break
+		end
+	end
+
+	return current_index and format_marker_progress(current_index, total) or nil
+end
+
+local function set_statusline_filename(tabpage, explorer, file_data)
+	local file_path = file_data and file_data.path or explorer and explorer.current_file_path
+	if not file_path or file_path == "" then
+		return
+	end
+
+	local lifecycle = helpers.get_loaded_module("codediff.ui.lifecycle")
+	if not lifecycle then
+		return
+	end
+
+	vim.schedule(function()
+		local original_bufnr, modified_bufnr = lifecycle.get_buffers(tabpage)
+		local filename = vim.fn.fnamemodify(file_path, ":t")
+		local progress = get_statusline_file_progress(explorer)
+
+		for _, bufnr in ipairs({ original_bufnr, modified_bufnr, explorer.bufnr }) do
+			if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+				vim.b[bufnr].codediff_status_name = filename
+				vim.b[bufnr].codediff_status_progress = progress
+			end
+		end
+
+		vim.cmd.redrawstatus()
+	end)
+end
+
 local function ensure_editable_added_file_override(tabpage, explorer)
 	if not explorer or explorer._user_added_file_override_installed or type(explorer.on_file_select) ~= "function" then
 		return
@@ -309,6 +359,7 @@ local function ensure_editable_added_file_override(tabpage, explorer)
 	explorer.on_file_select = function(file_data, opts)
 		original_on_file_select(file_data, opts)
 
+		set_statusline_filename(tabpage, explorer, file_data)
 		show_added_file_as_editable(tabpage, explorer, file_data)
 		ensure_added_file_stays_staged(tabpage, explorer, file_data)
 	end
@@ -398,8 +449,6 @@ function M.close_view(get_codediff_lifecycle)
 	if not lifecycle.confirm_close_with_unsaved(tabpage) then
 		return
 	end
-
-	capture_current_resume_snapshot(lifecycle, tabpage)
 
 	if #vim.api.nvim_list_tabpages() == 1 then
 		local tabnr = vim.api.nvim_tabpage_get_number(tabpage)
@@ -523,6 +572,7 @@ function M.ensure_explorer_window_state(get_codediff_lifecycle, tabpage)
 	end
 
 	ensure_editable_added_file_override(tabpage, explorer)
+	set_statusline_filename(tabpage, explorer)
 	disable_panel_scrollbind(get_explorer_winid(explorer))
 end
 
@@ -574,13 +624,63 @@ function M.get_file_position(tabpage)
 	return string.format("%d/%d", current_index, total)
 end
 
-function M.echo_file_position(tabpage)
-	local position = M.get_file_position(tabpage)
-	if not position then
-		return
+function M.get_hunk_progress(tabpage)
+	tabpage = tabpage or vim.api.nvim_get_current_tabpage()
+
+	local lifecycle = helpers.get_loaded_module("codediff.ui.lifecycle")
+	if not lifecycle then
+		return nil
 	end
 
-	vim.api.nvim_echo({ { string.format("%s files", position), "ModeMsg" } }, false, {})
+	local session = lifecycle.get_session(tabpage)
+	if not session then
+		return nil
+	end
+
+	local winid = vim.g.statusline_winid
+	if not winid or not vim.api.nvim_win_is_valid(winid) then
+		winid = vim.api.nvim_get_current_win()
+	end
+
+	local current_buf = vim.api.nvim_win_get_buf(winid)
+	local is_original = current_buf == session.original_bufnr
+	local is_modified = current_buf == session.modified_bufnr
+	local is_result = session.result_bufnr and current_buf == session.result_bufnr
+	if not is_original and not is_modified and not is_result then
+		local explorer = lifecycle.get_explorer(tabpage)
+		local is_explorer = explorer and current_buf == explorer.bufnr
+		local fallback_win = session.modified_win or session.original_win
+		if not is_explorer or not fallback_win or not vim.api.nvim_win_is_valid(fallback_win) then
+			return nil
+		end
+
+		winid = fallback_win
+		current_buf = vim.api.nvim_win_get_buf(winid)
+		is_original = current_buf == session.original_bufnr
+		is_modified = current_buf == session.modified_bufnr
+		is_result = session.result_bufnr and current_buf == session.result_bufnr
+		if not is_original and not is_modified and not is_result then
+			return nil
+		end
+	end
+
+	local changes = session.stored_diff_result and session.stored_diff_result.changes or nil
+	if not changes or #changes == 0 then
+		local explorer = lifecycle.get_explorer(tabpage)
+		local selection = explorer and explorer.current_selection or nil
+		return selection and selection.status == "A" and format_marker_progress(1, 1) or nil
+	end
+
+	local current_line = vim.api.nvim_win_get_cursor(winid)[1]
+	local current_index = 1
+	for i, change in ipairs(changes) do
+		local range = is_original and change.original or change.modified
+		if current_line >= range.start_line then
+			current_index = i
+		end
+	end
+
+	return format_marker_progress(current_index, #changes)
 end
 
 -- Hide/show the explorer while keeping the active diff windows usable.

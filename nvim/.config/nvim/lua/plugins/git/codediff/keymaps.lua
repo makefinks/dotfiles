@@ -2,9 +2,42 @@ local M = {}
 
 local helpers = require("plugins.git.codediff.helpers")
 
-local custom_codediff_keymaps =
-	{ "<CR>", "<Tab>", "<S-Tab>", "<C-q>", "ff", "<leader>e", "<leader>gz", "<leader>gu", "<leader>gx", "s", "u", "x" }
+local custom_codediff_keymaps = {
+	"<CR>",
+	"<Tab>",
+	"<S-Tab>",
+	"<C-j>",
+	"<C-k>",
+	"<C-q>",
+	"ff",
+	"<leader>e",
+	"<leader>gz",
+	"<leader>gu",
+	"<leader>gx",
+	"s",
+	"u",
+	"x",
+}
 local tracked_keymap_buffers = {}
+
+local function suppress_hunk_echo(action)
+	local original_echo = vim.api.nvim_echo
+	vim.api.nvim_echo = function(chunks, history, opts)
+		local message = chunks and chunks[1] and chunks[1][1] or ""
+		if message:match("^Hunk %d+ of %d+$") or message:match("^First hunk %(") or message:match("^Last hunk %(") then
+			return
+		end
+
+		return original_echo(chunks, history, opts)
+	end
+
+	local ok, err = pcall(action)
+	vim.api.nvim_echo = original_echo
+	vim.cmd.redrawstatus()
+	if not ok then
+		error(err)
+	end
+end
 
 local function clear_buffer_keymaps(bufnr)
 	if not (bufnr and vim.api.nvim_buf_is_valid(bufnr)) then
@@ -175,10 +208,25 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 
 	local original_bufnr, modified_bufnr = lifecycle.get_buffers(tabpage)
 	if session.mode == "explorer" then
+		local navigation = helpers.require_module("codediff.ui.view.navigation", nil, {
+			notify = false,
+			functions = { "next_hunk", "prev_hunk" },
+		})
+
 		for _, bufnr in ipairs({ original_bufnr, modified_bufnr }) do
 			set_buffer_keymap(bufnr, "<CR>", function()
 				deps.view.open_file_from_diff(get_codediff_lifecycle, tabpage)
 			end, "Close codediff and open file at cursor")
+
+			if navigation then
+				set_buffer_keymap(bufnr, "<C-j>", function()
+					suppress_hunk_echo(navigation.next_hunk)
+				end, "Next codediff hunk")
+
+				set_buffer_keymap(bufnr, "<C-k>", function()
+					suppress_hunk_echo(navigation.prev_hunk)
+				end, "Previous codediff hunk")
+			end
 
 			set_buffer_keymap(bufnr, "<leader>gz", function()
 				deps.actions.stage_entry(get_codediff_lifecycle, tabpage)

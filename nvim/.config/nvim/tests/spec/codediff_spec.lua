@@ -269,63 +269,6 @@ describe("local CodeDiff workflow", function()
 		assert.is_not_nil(resumed_explorer)
 	end)
 
-	it("resumes a closed codediff session at the last diff cursor", function()
-		local view = require("plugins.git.codediff.view")
-		local lifecycle = h.get_codediff_lifecycle()
-
-		repo = create_multiline_modified_files_repo()
-		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
-
-		h.wait_for(function()
-			return explorer.current_file_path == "alpha.lua" and explorer.current_file_group == "unstaged"
-		end, 10000, "CodeDiff did not select alpha.lua in the unstaged group")
-
-		local modified_bufnr
-		h.wait_for(function()
-			modified_bufnr = h.focus_modified_window(tabpage)
-			return modified_bufnr
-				and vim.api.nvim_buf_is_valid(modified_bufnr)
-				and vim.api.nvim_buf_line_count(modified_bufnr) >= 2
-		end, 10000, "CodeDiff modified buffer was not ready")
-
-		vim.api.nvim_win_set_cursor(0, { 2, 2 })
-		view.close_view(h.get_codediff_lifecycle)
-
-		h.wait_for(function()
-			return not lifecycle.get_session(tabpage)
-		end, 10000, "CodeDiff did not close")
-
-		view.resume_last_session(h.get_codediff_lifecycle)
-
-		local resumed_session
-		h.wait_for(function()
-			for _, tp in ipairs(vim.api.nvim_list_tabpages()) do
-				local session = lifecycle.get_session(tp)
-				local current_explorer = lifecycle.get_explorer(tp)
-				if
-					session
-					and current_explorer
-					and session.mode == "explorer"
-					and current_explorer.current_file_path == "alpha.lua"
-					and current_explorer.current_file_group == "unstaged"
-				then
-					resumed_session = session
-					return true
-				end
-			end
-
-			return false
-		end, 15000, "CodeDiff did not reopen the saved session")
-
-		h.wait_for(function()
-			return resumed_session
-				and resumed_session.modified_win
-				and vim.api.nvim_win_is_valid(resumed_session.modified_win)
-				and vim.api.nvim_get_current_win() == resumed_session.modified_win
-				and vim.deep_equal(vim.api.nvim_win_get_cursor(resumed_session.modified_win), { 2, 2 })
-		end, 15000, "CodeDiff did not restore the closed session cursor")
-	end)
-
 	it("can open the current file with explorer selection and diff focus", function()
 		repo = create_two_modified_files_repo()
 
@@ -346,7 +289,7 @@ describe("local CodeDiff workflow", function()
 		end, 10000, "CodeDiff did not focus the modified diff window")
 	end)
 
-	it("echoes the current CodeDiff file position during navigation", function()
+	it("updates the current CodeDiff file position without echoing during navigation", function()
 		repo = create_two_modified_files_repo()
 
 		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
@@ -355,9 +298,7 @@ describe("local CodeDiff workflow", function()
 			return require("plugins.git.codediff.view").get_file_position(tabpage) == "1/2"
 		end, 10000, "Initial CodeDiff file position was not available")
 
-		h.wait_for(function()
-			return echo_capture.contains("1/2 files")
-		end, 10000, "Initial CodeDiff file position message was not echoed")
+		assert.is_false(echo_capture.contains("1/2 files"))
 
 		assert.is_true(require("codediff").next_file())
 
@@ -366,8 +307,10 @@ describe("local CodeDiff workflow", function()
 		end, 10000, "CodeDiff did not navigate to beta.lua")
 
 		h.wait_for(function()
-			return echo_capture.contains("2/2 files")
-		end, 10000, "Updated CodeDiff file position message was not echoed")
+			return require("plugins.git.codediff.view").get_file_position(tabpage) == "2/2"
+		end, 10000, "Updated CodeDiff file position was not available")
+
+		assert.is_false(echo_capture.contains("2/2 files"))
 	end)
 
 	it("opens staged added files in an editable real buffer", function()
