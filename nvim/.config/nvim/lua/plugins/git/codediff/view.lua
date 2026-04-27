@@ -81,6 +81,30 @@ local function capture_resume_snapshot(session, explorer, cursor)
 	}
 end
 
+local function capture_current_resume_snapshot(lifecycle, tabpage)
+	local session = lifecycle.get_session(tabpage)
+	if not session or session.mode ~= "explorer" then
+		return
+	end
+
+	local explorer = lifecycle.get_explorer(tabpage)
+	local original_bufnr, modified_bufnr = lifecycle.get_buffers(tabpage)
+	local current_buf = vim.api.nvim_get_current_buf()
+	local cursor
+
+	if current_buf == original_bufnr or current_buf == modified_bufnr then
+		cursor = vim.api.nvim_win_get_cursor(0)
+	elseif session.modified_win and vim.api.nvim_win_is_valid(session.modified_win) then
+		cursor = vim.api.nvim_win_get_cursor(session.modified_win)
+	elseif session.original_win and vim.api.nvim_win_is_valid(session.original_win) then
+		cursor = vim.api.nvim_win_get_cursor(session.original_win)
+	end
+
+	if cursor then
+		capture_resume_snapshot(session, explorer, cursor)
+	end
+end
+
 local function apply_resume_snapshot(get_codediff_lifecycle, snapshot, attempt)
 	attempt = attempt or 1
 	local max_attempts = 80
@@ -374,6 +398,8 @@ function M.close_view(get_codediff_lifecycle)
 	if not lifecycle.confirm_close_with_unsaved(tabpage) then
 		return
 	end
+
+	capture_current_resume_snapshot(lifecycle, tabpage)
 
 	if #vim.api.nvim_list_tabpages() == 1 then
 		local tabnr = vim.api.nvim_tabpage_get_number(tabpage)

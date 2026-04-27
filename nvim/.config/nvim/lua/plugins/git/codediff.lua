@@ -11,29 +11,25 @@ end
 
 local function open_pr_diff_against_branch()
 	local modules = get_codediff_modules()
-	modules.helpers.with_branch(function(branch)
-		vim.ui.select(
-			{ "PR diff", "Branch vs HEAD", "Branch vs working tree" },
-			{ prompt = "Compare mode:" },
-			function(mode)
-				if not mode then
-					return
-				end
+	vim.ui.select({ "PR diff", "Branch vs HEAD", "Branch vs working tree" }, { prompt = "Diff style:" }, function(mode)
+		if not mode then
+			return
+		end
 
-				local escaped_branch = vim.fn.fnameescape(branch)
-				if mode == "PR diff" then
-					vim.cmd("CodeDiff " .. escaped_branch .. "...")
-					return
-				end
-
-				if mode == "Branch vs HEAD" then
-					vim.cmd("CodeDiff " .. escaped_branch .. " HEAD")
-					return
-				end
-
-				vim.cmd("CodeDiff " .. escaped_branch)
+		modules.helpers.with_branch(function(branch)
+			local escaped_branch = vim.fn.fnameescape(branch)
+			if mode == "PR diff" then
+				vim.cmd("CodeDiff " .. escaped_branch .. "...")
+				return
 			end
-		)
+
+			if mode == "Branch vs HEAD" then
+				vim.cmd("CodeDiff " .. escaped_branch .. " HEAD")
+				return
+			end
+
+			vim.cmd("CodeDiff " .. escaped_branch)
+		end)
 	end)
 end
 
