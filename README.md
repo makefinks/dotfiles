@@ -2,6 +2,8 @@
 
 Personal configuration files for Zsh, Neovim, tmux, and Ghostty.
 
+AI prompt/agent files under `ai/` are intentionally local-only and ignored by git.
+
 ## Install
 
 ```bash
@@ -26,3 +28,11 @@ chsh -s "$(command -v zsh)"
 - **tmux** - Terminal multiplexer config
 - **ghostty** - Terminal emulator config
 - **zsh** - Oh My Zsh config with the Powerlevel10k prompt
+
+## Validate
+
+```bash
+./scripts/check.sh
+```
+
+This formats/lints shell and Lua files, then runs the Neovim test suite.

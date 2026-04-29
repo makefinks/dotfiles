@@ -2,7 +2,6 @@
 return {
 	{
 		"akinsho/toggleterm.nvim",
-		-- Temporary review marker: terminal plugin spec comment.
 		cmd = { "ToggleTerm", "TermExec" },
 		opts = {
 			size = 15,

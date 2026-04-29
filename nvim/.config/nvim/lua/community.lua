@@ -4,7 +4,7 @@
 
 ---@type LazySpec
 return {
-  { "AstroNvim/astrocommunity", lazy = true },
-  { import = "astrocommunity.pack.lua", lazy = true },
-  { import = "astrocommunity.recipes.neovide", lazy = true },
+	{ "AstroNvim/astrocommunity", lazy = true },
+	{ import = "astrocommunity.pack.lua", lazy = true },
+	{ import = "astrocommunity.recipes.neovide", lazy = true },
 }

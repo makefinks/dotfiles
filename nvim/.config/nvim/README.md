@@ -1,10 +1,10 @@
 # AstroNvim config
 
-This neovim config is used by me and designed to work across WSL (Ubuntu) / and MacOS (and probably on most linux distros).
+This Neovim config is used by me and designed to work across WSL (Ubuntu), macOS, and probably most Linux distros.
 The purpose is to have single configuration that can be used at home and work with a toggle for certain plugins/features.
 Built for Neovim >= 0.12.0.
 
-The goal is to have fast and functional but also asthetically pleasing setup.
+The goal is to have a fast, functional, and aesthetically pleasing setup.
 
 ## Highlights
 
@@ -95,7 +95,7 @@ pip install pynvim
 | **fff**              | File picker              | ✓    | ✓    | Super fast + Typo resistant + project aware file picker                                            |
 | **neogit**           | Git integration          | ✓    | ✓    | Magit-style Git interface within Neovim for staging, committing, branching, and viewing diffs      |
 | **flash**            | Enhanced search & motion | ✓    | ✓    | Super-fast navigation with labels for jumping to any location in visible text                      |
-| **conform**          | Code formatting          | ✓    | ✓    | Auto-formats code on save with configurable formatters per filetype (StyLua, Prettier, Ruff, etc.) |
+| **conform**          | Code formatting          | ✓    | ✓    | Configurable formatters per filetype (StyLua, Prettier, Ruff, etc.)                                |
 | **noice**            | Enhanced command line    | ✓    | ✓    | Replaces default cmdline with better UI, notifications, and command history                        |
 | **snacks**           | Utility collection       | ✓    | ✓    | Provides dashboard, notifications, file picker and other UI utils                                  |
 | **toggleterm**       | Terminal management      | ✓    | ✓    | Quick terminal access with customizable layouts (horizontal/vertical/float)                        |
@@ -104,6 +104,21 @@ pip install pynvim
 | **resession**        | Session management       | ✓    | ✓    | Auto-saves and restores workspace sessions including open files, cursor positions, and layout      |
 | **markdown-preview** | Live markdown preview    | ✓    | ✓    | Real-time preview of markdown files with GitHub-style rendering                                    |
 | **startup-time**     | Performance monitoring   | ✓    | ✓    | Tracks and displays Neovim startup time for optimization                                           |
-| **none-ls**          | Formatting & linting     | ✓    | ✓    | Provides formatting and linting capabilities as an alternative to LSP                              |
 | **leetcode**         | LeetCode integration     | ✓    | ✗    | LeetCode directly inside of neovim                                                                 |
 | **typr**             | Typing practice          | ✓    | ✗    | Monkey-type inspired typing practice tool                                                          |
+
+## Validate
+
+From the repository root:
+
+```bash
+./scripts/check.sh
+```
+
+From this Neovim config directory, the main commands are:
+
+```bash
+stylua .
+selene .
+./tests/run.sh
+```

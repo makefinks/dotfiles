@@ -12,7 +12,7 @@ local function supports_ghostty_progress()
 end
 
 local function supports_nvim_echo_progress()
-	return vim.fn.has "nvim-0.12" == 1
+	return vim.fn.has("nvim-0.12") == 1
 end
 
 local function tmux_wrap(sequence)

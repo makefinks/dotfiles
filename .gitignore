@@ -1,2 +1,6 @@
 zsh/.local/
 ai/
+.DS_Store
+.ruff_cache/
+nvim/.config/nvim/lua/local.lua
+nvim/.config/nvim/test.md

@@ -600,7 +600,11 @@ local quotes = {
 		text = "Your solution is likely way more complicated than required.",
 		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
 	},
-	{ author = "Kyzer Davis", text = "Experimental.", source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html" },
+	{
+		author = "Kyzer Davis",
+		text = "Experimental.",
+		source = "https://www.ietf.org/archive/id/draft-davis-dispatch-the-truths-of-it-00.html",
+	},
 	{
 		author = "Kyzer Davis",
 		text = "Reserved for Future Use (but will likely never be used.)",
