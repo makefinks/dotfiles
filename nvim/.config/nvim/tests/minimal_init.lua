@@ -31,5 +31,4 @@ package.path = table.concat({
 
 vim.cmd("runtime! plugin/*.lua plugin/*.vim")
 
-local codediff_spec = require("plugins.git.codediff")
-codediff_spec.config()
+require("plugins.git.codediff").config()

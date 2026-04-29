@@ -88,7 +88,7 @@ describe("local CodeDiff workflow", function()
 	end)
 
 	it("stages from hidden diff buffers and reopens with refreshed explorer state", function()
-		local actions = require("plugins.git.codediff.actions")
+		local actions = require("user.codediff.actions")
 
 		repo = create_two_modified_files_repo()
 		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
@@ -118,7 +118,7 @@ describe("local CodeDiff workflow", function()
 	end)
 
 	it("unstages from hidden diff buffers and reopens with refreshed explorer state", function()
-		local actions = require("plugins.git.codediff.actions")
+		local actions = require("user.codediff.actions")
 
 		repo = create_two_staged_files_repo()
 		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
@@ -148,7 +148,7 @@ describe("local CodeDiff workflow", function()
 	end)
 
 	it("rebinds diff-buffer mappings after staging advances to the next file", function()
-		local actions = require("plugins.git.codediff.actions")
+		local actions = require("user.codediff.actions")
 
 		repo = create_two_modified_files_repo()
 		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
@@ -186,7 +186,7 @@ describe("local CodeDiff workflow", function()
 	end)
 
 	it("closes codediff and opens the working tree file at the diff cursor", function()
-		local view = require("plugins.git.codediff.view")
+		local view = require("user.codediff.view")
 
 		repo = create_two_modified_files_repo()
 		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
@@ -215,7 +215,7 @@ describe("local CodeDiff workflow", function()
 	end)
 
 	it("resumes the last codediff session at the saved diff cursor", function()
-		local view = require("plugins.git.codediff.view")
+		local view = require("user.codediff.view")
 		local lifecycle = h.get_codediff_lifecycle()
 
 		repo = create_multiline_modified_files_repo()
@@ -305,7 +305,7 @@ describe("local CodeDiff workflow", function()
 		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
 
 		h.wait_for(function()
-			return require("plugins.git.codediff.view").get_file_position(tabpage) == "1/2"
+			return require("user.codediff.view").get_file_position(tabpage) == "1/2"
 		end, 10000, "Initial CodeDiff file position was not available")
 
 		assert.is_false(echo_capture.contains("1/2 files"))
@@ -317,7 +317,7 @@ describe("local CodeDiff workflow", function()
 		end, 10000, "CodeDiff did not navigate to beta.lua")
 
 		h.wait_for(function()
-			return require("plugins.git.codediff.view").get_file_position(tabpage) == "2/2"
+			return require("user.codediff.view").get_file_position(tabpage) == "2/2"
 		end, 10000, "Updated CodeDiff file position was not available")
 
 		assert.is_false(echo_capture.contains("2/2 files"))
@@ -349,7 +349,7 @@ describe("local CodeDiff workflow", function()
 			return false
 		end, 15000, "Revision CodeDiff explorer was not ready")
 
-		require("plugins.git.codediff.view").set_explorer_options(h.get_codediff_lifecycle, tabpage, {
+		require("user.codediff.view").set_explorer_options(h.get_codediff_lifecycle, tabpage, {
 			hide_untracked = true,
 		})
 

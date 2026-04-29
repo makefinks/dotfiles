@@ -1,6 +1,6 @@
 local M = {}
 
-local helpers = require("plugins.git.codediff.helpers")
+local helpers = require("user.codediff.helpers")
 
 local custom_codediff_keymaps = {
 	"<CR>",

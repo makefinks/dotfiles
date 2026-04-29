@@ -1,6 +1,8 @@
-# CodeDiff config
+# CodeDiff Extension
 
 This folder contains the local behavior layered on top of `esmuellert/codediff.nvim`.
+
+The Lazy plugin spec lives in `lua/plugins/git/codediff.lua`; this namespace owns the personal extension layer.
 
 The goal of the setup is:
 
@@ -11,16 +13,15 @@ The goal of the setup is:
 
 ## File map
 
-- `codediff.lua`: plugin spec, top-level keybindings, autocommands, upstream setup
-- `codediff/helpers.lua`: repo resolution, branch helpers, safe module loading, untracked filtering
-- `codediff/view.lua`: opening/closing diff tabs, explorer visibility, explorer refresh patch
-- `codediff/actions.lua`: stage, unstage, restore, picker, explorer entry handling
-- `codediff/markview.lua`: temporary markview disable/restore for markdown-like buffers
-- `codediff/keymaps.lua`: tab-local mappings applied when a codediff tab opens
+- `init.lua`: top-level commands, autocommands, and upstream `codediff.setup` options
+- `helpers.lua`: repo resolution, branch helpers, safe module loading, untracked filtering
+- `view.lua`: opening/closing diff tabs, explorer visibility, explorer refresh patch
+- `actions.lua`: stage, unstage, restore, picker, explorer entry handling
+- `keymaps.lua`: tab-local mappings applied when a codediff tab opens
 
 ## Entry points
 
-Global mappings from `codediff.lua`:
+Global mappings from `lua/plugins/git/codediff.lua`:
 
 - `<leader>gd`: open codediff for the current file's repository and focus that file
 - `<leader>gD`: open codediff for the current working directory's repository
@@ -39,13 +40,7 @@ Git actions:
 
 - `gitsigns` stage mappings are removed so codediff owns `<leader>gz`
 - explorer and diff buffers both support stage, unstage, and discard actions
-- when codediff opens, one representative file per LSP/root pair is loaded in the background
-- those temporary buffers are deleted when the codediff tab closes
-
-Markview handling:
-
-- markdown-like buffers inside codediff have markview disabled temporarily
-- the previous enabled state is restored on close
+- statusline state is exposed for the Heirline config
 
 ## Local codediff keymaps
 

@@ -5,7 +5,7 @@ return {
 			local status = require("astroui.status")
 
 			local function codediff_view()
-				return package.loaded["plugins.git.codediff.view"]
+				return package.loaded["user.codediff.view"]
 			end
 
 			local function codediff_statusline_state()

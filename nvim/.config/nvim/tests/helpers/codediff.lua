@@ -66,7 +66,7 @@ function M.open_status_explorer(repo, focus_file, opts)
 	local lifecycle = M.get_codediff_lifecycle()
 	local tabpage
 
-	require("plugins.git.codediff.view").open_status_explorer(
+	require("user.codediff.view").open_status_explorer(
 		repo.dir,
 		focus_file,
 		opts or { hide_untracked = true },
@@ -114,7 +114,7 @@ function M.set_explorer_hidden(tabpage, hidden)
 	assert(explorer, "CodeDiff explorer missing")
 
 	if explorer.is_hidden ~= hidden then
-		require("plugins.git.codediff.view").toggle_explorer(M.get_codediff_lifecycle, tabpage)
+		require("user.codediff.view").toggle_explorer(M.get_codediff_lifecycle, tabpage)
 	end
 
 	M.wait_for(function()

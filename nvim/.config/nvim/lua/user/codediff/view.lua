@@ -1,6 +1,6 @@
 local M = {}
 
-local helpers = require("plugins.git.codediff.helpers")
+local helpers = require("user.codediff.helpers")
 
 local last_resume_snapshot = nil
 local statusline_state_by_tabpage = {}

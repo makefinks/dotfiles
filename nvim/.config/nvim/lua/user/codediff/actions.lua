@@ -1,7 +1,7 @@
 local M = {}
 
-local helpers = require("plugins.git.codediff.helpers")
-local view = require("plugins.git.codediff.view")
+local helpers = require("user.codediff.helpers")
+local view = require("user.codediff.view")
 
 local function normalize_repo_relative_path(git_root, path)
 	if not git_root or not path or path == "" then
