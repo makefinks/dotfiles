@@ -412,7 +412,7 @@ local function ensure_editable_added_file_override(tabpage, explorer)
 	explorer._user_added_file_override_installed = true
 end
 
-local function set_explorer_options(get_codediff_lifecycle, tabpage, opts)
+function M.set_explorer_options(get_codediff_lifecycle, tabpage, opts)
 	local lifecycle = get_codediff_lifecycle()
 	if not lifecycle then
 		return
@@ -465,7 +465,7 @@ function M.open_status_explorer(repo, focus_file, opts, get_codediff_lifecycle)
 			}, "")
 
 			local tabpage = vim.api.nvim_get_current_tabpage()
-			set_explorer_options(get_codediff_lifecycle, tabpage, {
+			M.set_explorer_options(get_codediff_lifecycle, tabpage, {
 				hide_untracked = opts.hide_untracked ~= false,
 			})
 
@@ -853,21 +853,38 @@ function M.install_refresh_filter()
 
 		local git = helpers.require_module("codediff.core.git", nil, {
 			notify = false,
-			functions = "get_status",
+			functions = { "get_status", "get_diff_revision", "get_diff_revisions" },
 		})
 		if not git then
 			return original_refresh(explorer, ...)
 		end
 
-		local original_get_status = git.get_status
-		git.get_status = function(git_root, callback)
-			return original_get_status(git_root, function(err, status_result)
+		local function filter_callback(callback)
+			return function(err, status_result)
 				callback(err, helpers.filter_untracked_status_result(status_result))
-			end)
+			end
+		end
+
+		local original_get_status = git.get_status
+		local original_get_diff_revision = git.get_diff_revision
+		local original_get_diff_revisions = git.get_diff_revisions
+
+		git.get_status = function(git_root, callback)
+			return original_get_status(git_root, filter_callback(callback))
+		end
+
+		git.get_diff_revision = function(revision, git_root, callback)
+			return original_get_diff_revision(revision, git_root, filter_callback(callback))
+		end
+
+		git.get_diff_revisions = function(rev1, rev2, git_root, callback)
+			return original_get_diff_revisions(rev1, rev2, git_root, filter_callback(callback))
 		end
 
 		local ok, result = pcall(original_refresh, explorer, ...)
 		git.get_status = original_get_status
+		git.get_diff_revision = original_get_diff_revision
+		git.get_diff_revisions = original_get_diff_revisions
 		if not ok then
 			error(result)
 		end

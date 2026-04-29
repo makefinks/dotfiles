@@ -11,6 +11,60 @@ end
 
 local function open_pr_diff_against_branch()
 	local modules = get_codediff_modules()
+
+	local function open_filtered_command(command)
+		local git = modules.helpers.require_module("codediff.core.git", nil, {
+			notify = false,
+			functions = { "get_status", "get_diff_revision" },
+		})
+
+		if not git then
+			vim.cmd(command)
+			return
+		end
+
+		local original_get_status = git.get_status
+		local original_get_diff_revision = git.get_diff_revision
+		local restored = false
+		local group = vim.api.nvim_create_augroup("user_codediff_filtered_command", { clear = true })
+
+		local function restore_git()
+			if restored then
+				return
+			end
+
+			git.get_status = original_get_status
+			git.get_diff_revision = original_get_diff_revision
+			restored = true
+		end
+
+		git.get_status = function(git_root, callback)
+			return original_get_status(git_root, function(err, status_result)
+				callback(err, modules.helpers.filter_untracked_status_result(status_result))
+			end)
+		end
+
+		git.get_diff_revision = function(revision, git_root, callback)
+			return original_get_diff_revision(revision, git_root, function(err, status_result)
+				callback(err, modules.helpers.filter_untracked_status_result(status_result))
+			end)
+		end
+
+		vim.api.nvim_create_autocmd("User", {
+			group = group,
+			pattern = "CodeDiffOpen",
+			once = true,
+			callback = function(args)
+				restore_git()
+				local tabpage = args.data and args.data.tabpage or vim.api.nvim_get_current_tabpage()
+				modules.view.set_explorer_options(get_codediff_lifecycle, tabpage, { hide_untracked = true })
+			end,
+		})
+
+		vim.defer_fn(restore_git, 10000)
+		vim.cmd(command)
+	end
+
 	modules.helpers.with_branch(function(branch)
 		vim.ui.select(
 			{ "PR diff", "Branch vs HEAD", "Branch vs working tree" },
@@ -22,16 +76,16 @@ local function open_pr_diff_against_branch()
 
 				local escaped_branch = vim.fn.fnameescape(branch)
 				if mode == "PR diff" then
-					vim.cmd("CodeDiff " .. escaped_branch .. "...")
+					open_filtered_command("CodeDiff " .. escaped_branch .. "...")
 					return
 				end
 
 				if mode == "Branch vs HEAD" then
-					vim.cmd("CodeDiff " .. escaped_branch .. " HEAD")
+					open_filtered_command("CodeDiff " .. escaped_branch .. " HEAD")
 					return
 				end
 
-				vim.cmd("CodeDiff " .. escaped_branch)
+				open_filtered_command("CodeDiff " .. escaped_branch)
 			end
 		)
 	end)
