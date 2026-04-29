@@ -10,5 +10,4 @@ return {
 	{ import = "plugins.terminal" },
 	{ import = "plugins.markdown" },
 	{ import = "plugins.workflow" },
-	{ import = "plugins.fun" },
 }

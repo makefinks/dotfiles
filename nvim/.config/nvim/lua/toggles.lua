@@ -5,10 +5,6 @@ M.profile = vim.env.NVIM_PROFILE or "home"
 
 M.plugins = {
 
-	-- fun
-	leetcode = { home = true, work = false },
-	typr = { home = true, work = false },
-
 	-- ai
 	copilot = { home = true, work = true },
 

@@ -104,8 +104,6 @@ pip install pynvim
 | **resession**        | Session management       | ✓    | ✓    | Auto-saves and restores workspace sessions including open files, cursor positions, and layout      |
 | **markdown-preview** | Live markdown preview    | ✓    | ✓    | Real-time preview of markdown files with GitHub-style rendering                                    |
 | **startup-time**     | Performance monitoring   | ✓    | ✓    | Tracks and displays Neovim startup time for optimization                                           |
-| **leetcode**         | LeetCode integration     | ✓    | ✗    | LeetCode directly inside of neovim                                                                 |
-| **typr**             | Typing practice          | ✓    | ✗    | Monkey-type inspired typing practice tool                                                          |
 
 ## Validate
 

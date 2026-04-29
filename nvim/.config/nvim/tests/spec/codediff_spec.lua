@@ -54,6 +54,16 @@ local function create_multiline_modified_files_repo()
 	return repo
 end
 
+local function create_modified_and_untracked_repo()
+	repo = h.create_temp_git_repo()
+	repo.write_file("tracked.lua", { "return 'tracked'" })
+	repo.git_ok({ "add", "." })
+	repo.git_ok({ "commit", "-m", "initial" })
+	repo.write_file("tracked.lua", { "return 'tracked modified'" })
+	repo.write_file("scratch.md", { "scratch" })
+	return repo
+end
+
 describe("local CodeDiff workflow", function()
 	before_each(function()
 		original_cwd = vim.fn.getcwd()
@@ -311,6 +321,44 @@ describe("local CodeDiff workflow", function()
 		end, 10000, "Updated CodeDiff file position was not available")
 
 		assert.is_false(echo_capture.contains("2/2 files"))
+	end)
+
+	it("keeps untracked files hidden after refreshing revision explorers", function()
+		repo = create_modified_and_untracked_repo()
+		vim.fn.chdir(repo.dir)
+
+		vim.cmd("CodeDiff HEAD")
+
+		local lifecycle = h.get_codediff_lifecycle()
+		local tabpage
+		local explorer
+		h.wait_for(function()
+			for _, tp in ipairs(vim.api.nvim_list_tabpages()) do
+				local current_explorer = lifecycle.get_explorer(tp)
+				if
+					current_explorer
+					and current_explorer.base_revision
+					and current_explorer.target_revision == "WORKING"
+				then
+					tabpage = tp
+					explorer = current_explorer
+					return true
+				end
+			end
+
+			return false
+		end, 15000, "Revision CodeDiff explorer was not ready")
+
+		require("plugins.git.codediff.view").set_explorer_options(h.get_codediff_lifecycle, tabpage, {
+			hide_untracked = true,
+		})
+
+		require("codediff.ui.explorer.refresh").refresh(explorer)
+
+		h.wait_for(function()
+			return h.find_tree_entry(explorer, "tracked.lua", "unstaged")
+				and not h.find_tree_entry(explorer, "scratch.md", "unstaged")
+		end, 10000, "Refresh brought untracked files back into the explorer")
 	end)
 
 	it("opens staged added files in an editable real buffer", function()
