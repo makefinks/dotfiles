@@ -26,6 +26,40 @@ local function path_exists(path)
 	return path and vim.uv.fs_stat(path) ~= nil
 end
 
+local function with_cwd(path, callback)
+	local previous_cwd = vim.fn.getcwd()
+	local ok, err = pcall(vim.fn.chdir, path)
+	if not ok then
+		vim.notify(string.format("Failed to enter CodeDiff repo: %s", err), vim.log.levels.ERROR)
+		return false
+	end
+
+	local callback_ok, callback_err = pcall(callback)
+	pcall(vim.fn.chdir, previous_cwd)
+	if not callback_ok then
+		error(callback_err)
+	end
+
+	return true
+end
+
+local function open_revision_snapshot(snapshot)
+	local original_revision = snapshot.original_revision
+	local modified_revision = snapshot.modified_revision
+	if not original_revision then
+		return false
+	end
+
+	local args = { vim.fn.fnameescape(original_revision) }
+	if modified_revision and modified_revision ~= "WORKING" then
+		args[#args + 1] = vim.fn.fnameescape(modified_revision)
+	end
+
+	return with_cwd(snapshot.repo, function()
+		vim.cmd("CodeDiff " .. table.concat(args, " "))
+	end)
+end
+
 local function clamp_cursor_position(bufnr, cursor)
 	local line_count = vim.api.nvim_buf_line_count(bufnr)
 	local line = math.min(math.max(cursor[1], 1), math.max(line_count, 1))
@@ -137,7 +171,51 @@ local function capture_resume_snapshot(session, explorer, cursor)
 		cursor = vim.deepcopy(cursor),
 		hide_untracked = session.hide_untracked ~= false,
 		explorer_hidden = explorer.is_hidden or false,
+		original_revision = session.original_revision,
+		modified_revision = session.modified_revision,
 	}
+end
+
+local function get_resume_cursor(session)
+	local current_win = vim.api.nvim_get_current_win()
+	if current_win and vim.api.nvim_win_is_valid(current_win) then
+		local current_buf = vim.api.nvim_win_get_buf(current_win)
+		if
+			current_buf == session.original_bufnr
+			or current_buf == session.modified_bufnr
+			or current_buf == session.result_bufnr
+		then
+			return vim.api.nvim_win_get_cursor(current_win)
+		end
+	end
+
+	for _, winid in ipairs({ session.modified_win, session.original_win, session.result_win }) do
+		if winid and vim.api.nvim_win_is_valid(winid) then
+			return vim.api.nvim_win_get_cursor(winid)
+		end
+	end
+
+	return { 1, 0 }
+end
+
+function M.save_resume_snapshot(get_codediff_lifecycle, tabpage, cursor)
+	local lifecycle = get_codediff_lifecycle()
+	if not lifecycle then
+		return
+	end
+
+	tabpage = tabpage or vim.api.nvim_get_current_tabpage()
+	local session = lifecycle.get_session(tabpage)
+	local explorer = lifecycle.get_explorer(tabpage)
+	if not session or not explorer or session.mode ~= "explorer" then
+		return
+	end
+	if session._user_resume_snapshot_saved and not cursor then
+		return
+	end
+
+	capture_resume_snapshot(session, explorer, cursor or get_resume_cursor(session))
+	session._user_resume_snapshot_saved = true
 end
 
 local function apply_resume_snapshot(get_codediff_lifecycle, snapshot, attempt)
@@ -495,6 +573,8 @@ function M.close_view(get_codediff_lifecycle)
 		return
 	end
 
+	M.save_resume_snapshot(get_codediff_lifecycle, tabpage)
+
 	if #vim.api.nvim_list_tabpages() == 1 then
 		local tabnr = vim.api.nvim_tabpage_get_number(tabpage)
 		vim.cmd("tabnew")
@@ -555,7 +635,7 @@ function M.open_file_from_diff(get_codediff_lifecycle, tabpage)
 		return
 	end
 
-	capture_resume_snapshot(session, explorer, cursor)
+	M.save_resume_snapshot(get_codediff_lifecycle, tabpage, cursor)
 
 	M.close_view(get_codediff_lifecycle)
 
@@ -588,12 +668,26 @@ function M.resume_last_session(get_codediff_lifecycle)
 		return
 	end
 
-	M.open_status_explorer(snapshot.repo, snapshot.file_path, {
-		hide_untracked = snapshot.hide_untracked,
-		focus_diff = true,
-	}, get_codediff_lifecycle)
+	if snapshot.original_revision then
+		if not open_revision_snapshot(snapshot) then
+			return
+		end
+	else
+		M.open_status_explorer(snapshot.repo, snapshot.file_path, {
+			hide_untracked = snapshot.hide_untracked,
+			focus_diff = true,
+		}, get_codediff_lifecycle)
+	end
 
 	vim.defer_fn(function()
+		local lifecycle = get_codediff_lifecycle()
+		local tabpage = vim.api.nvim_get_current_tabpage()
+		if lifecycle and lifecycle.get_session(tabpage) then
+			M.set_explorer_options(get_codediff_lifecycle, tabpage, {
+				hide_untracked = snapshot.hide_untracked,
+			})
+		end
+
 		apply_resume_snapshot(get_codediff_lifecycle, snapshot)
 	end, 80)
 end

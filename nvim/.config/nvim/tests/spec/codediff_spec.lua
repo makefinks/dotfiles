@@ -54,6 +54,33 @@ local function create_multiline_modified_files_repo()
 	return repo
 end
 
+local function create_two_revision_repo()
+	repo = h.create_temp_git_repo()
+	repo.write_file("alpha.lua", {
+		"local alpha = {",
+		"  value = 'alpha',",
+		"}",
+		"",
+		"return alpha",
+	})
+	repo.git_ok({ "add", "." })
+	repo.git_ok({ "commit", "-m", "initial" })
+	local base_revision = vim.trim(repo.git_ok({ "rev-parse", "HEAD" }))
+
+	repo.write_file("alpha.lua", {
+		"local alpha = {",
+		"  value = 'alpha changed on branch',",
+		"}",
+		"",
+		"return alpha",
+	})
+	repo.git_ok({ "add", "." })
+	repo.git_ok({ "commit", "-m", "change alpha" })
+	local head_revision = vim.trim(repo.git_ok({ "rev-parse", "HEAD" }))
+
+	return repo, base_revision, head_revision
+end
+
 local function create_modified_and_untracked_repo()
 	repo = h.create_temp_git_repo()
 	repo.write_file("tracked.lua", { "return 'tracked'" })
@@ -216,7 +243,6 @@ describe("local CodeDiff workflow", function()
 
 	it("resumes the last codediff session at the saved diff cursor", function()
 		local view = require("user.codediff.view")
-		local lifecycle = h.get_codediff_lifecycle()
 
 		repo = create_multiline_modified_files_repo()
 		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
@@ -243,29 +269,10 @@ describe("local CodeDiff workflow", function()
 
 		view.resume_last_session(h.get_codediff_lifecycle)
 
-		local resumed_tabpage
-		local resumed_session
-		local resumed_explorer
-		h.wait_for(function()
-			for _, tp in ipairs(vim.api.nvim_list_tabpages()) do
-				local session = lifecycle.get_session(tp)
-				local current_explorer = lifecycle.get_explorer(tp)
-				if
-					session
-					and current_explorer
-					and session.mode == "explorer"
-					and current_explorer.current_file_path == "alpha.lua"
-					and current_explorer.current_file_group == "unstaged"
-				then
-					resumed_tabpage = tp
-					resumed_session = session
-					resumed_explorer = current_explorer
-					return true
-				end
-			end
-
-			return false
-		end, 15000, "CodeDiff did not reopen the saved session")
+		local resumed_tabpage, resumed_session, resumed_explorer = h.wait_for_explorer_session({
+			file_path = "alpha.lua",
+			group = "unstaged",
+		}, 15000, "CodeDiff did not reopen the saved session")
 
 		h.wait_for(function()
 			return resumed_session
@@ -279,10 +286,103 @@ describe("local CodeDiff workflow", function()
 		assert.is_not_nil(resumed_explorer)
 	end)
 
+	it("resumes the last codediff session after closing the view", function()
+		local view = require("user.codediff.view")
+		local lifecycle = h.get_codediff_lifecycle()
+
+		repo = create_multiline_modified_files_repo()
+		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+
+		h.wait_for(function()
+			return explorer.current_file_path == "alpha.lua" and explorer.current_file_group == "unstaged"
+		end, 10000, "CodeDiff did not select alpha.lua in the unstaged group")
+
+		local modified_bufnr
+		h.wait_for(function()
+			modified_bufnr = h.focus_modified_window(tabpage)
+			return modified_bufnr
+				and vim.api.nvim_buf_is_valid(modified_bufnr)
+				and vim.api.nvim_buf_line_count(modified_bufnr) >= 2
+		end, 10000, "CodeDiff modified buffer was not ready")
+
+		vim.api.nvim_win_set_cursor(0, { 2, 2 })
+		view.close_view(h.get_codediff_lifecycle)
+
+		h.wait_for(function()
+			return lifecycle.get_session(tabpage) == nil
+		end, 10000, "CodeDiff did not close")
+
+		view.resume_last_session(h.get_codediff_lifecycle)
+
+		local _, resumed_session, resumed_explorer = h.wait_for_explorer_session({
+			file_path = "alpha.lua",
+			group = "unstaged",
+		}, 15000, "CodeDiff did not reopen the closed session")
+
+		h.wait_for(function()
+			return resumed_session
+				and resumed_session.modified_win
+				and vim.api.nvim_win_is_valid(resumed_session.modified_win)
+				and vim.api.nvim_get_current_win() == resumed_session.modified_win
+				and vim.deep_equal(vim.api.nvim_win_get_cursor(resumed_session.modified_win), { 2, 2 })
+		end, 15000, "CodeDiff did not restore the saved close cursor")
+
+		assert.is_not_nil(resumed_explorer)
+	end)
+
+	it("resumes revision explorer sessions with their original revisions", function()
+		local view = require("user.codediff.view")
+		local lifecycle = h.get_codediff_lifecycle()
+
+		local base_revision
+		local head_revision
+		repo, base_revision, head_revision = create_two_revision_repo()
+		vim.fn.chdir(repo.dir)
+		vim.cmd("CodeDiff " .. base_revision .. " " .. head_revision)
+
+		local tabpage, session = h.wait_for_explorer_session({
+			file_path = "alpha.lua",
+			original_revision = base_revision,
+			modified_revision = head_revision,
+		}, 15000, "CodeDiff revision explorer did not open alpha.lua")
+
+		h.wait_for(function()
+			return session.modified_win and vim.api.nvim_win_is_valid(session.modified_win)
+		end, 10000, "CodeDiff revision modified window was not ready")
+
+		vim.api.nvim_set_current_win(session.modified_win)
+		vim.api.nvim_win_set_cursor(0, { 2, 2 })
+		view.close_view(h.get_codediff_lifecycle)
+
+		h.wait_for(function()
+			return lifecycle.get_session(tabpage) == nil
+		end, 10000, "CodeDiff revision explorer did not close")
+
+		view.resume_last_session(h.get_codediff_lifecycle)
+
+		local _, resumed_session, resumed_explorer = h.wait_for_explorer_session({
+			file_path = "alpha.lua",
+			original_revision = base_revision,
+			modified_revision = head_revision,
+		}, 15000, "CodeDiff did not resume the saved revision explorer")
+
+		h.wait_for(function()
+			return resumed_session
+				and resumed_session.modified_win
+				and vim.api.nvim_win_is_valid(resumed_session.modified_win)
+				and vim.api.nvim_get_current_win() == resumed_session.modified_win
+				and vim.deep_equal(vim.api.nvim_win_get_cursor(resumed_session.modified_win), { 2, 2 })
+		end, 15000, "CodeDiff did not restore the revision diff cursor")
+
+		assert.is_not_nil(resumed_explorer)
+		assert.equals(base_revision, resumed_session.original_revision)
+		assert.equals(head_revision, resumed_session.modified_revision)
+	end)
+
 	it("can open the current file with explorer selection and diff focus", function()
 		repo = create_two_modified_files_repo()
 
-		local tabpage, session, explorer = h.open_status_explorer(repo, "alpha.lua", {
+		local _, session, explorer = h.open_status_explorer(repo, "alpha.lua", {
 			hide_untracked = true,
 			focus_diff = true,
 		})

@@ -205,6 +205,7 @@ function M.setup()
 		pattern = "CodeDiffClose",
 		callback = function(args)
 			local tabpage = args.data and args.data.tabpage or vim.api.nvim_get_current_tabpage()
+			modules.view.save_resume_snapshot(get_codediff_lifecycle, tabpage)
 			modules.view.clear_statusline_state(tabpage)
 			modules.keymaps.clear_tab_keymaps(tabpage, get_codediff_lifecycle)
 		end,
@@ -222,7 +223,7 @@ function M.setup()
 		},
 		keymaps = {
 			view = {
-				quit = "q",
+				quit = false,
 				toggle_explorer = false,
 				focus_explorer = false,
 				next_hunk = false,

@@ -9,6 +9,7 @@ local custom_codediff_keymaps = {
 	"<C-j>",
 	"<C-k>",
 	"<C-q>",
+	"q",
 	"ff",
 	"<leader>e",
 	"<leader>gz",
@@ -200,6 +201,16 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 		tabpage,
 		"n",
 		"<C-q>",
+		wrap_tab_action(tabpage, get_codediff_lifecycle, function()
+			deps.view.close_view(get_codediff_lifecycle)
+		end),
+		{ desc = "Close codediff view" }
+	)
+
+	lifecycle.set_tab_keymap(
+		tabpage,
+		"n",
+		"q",
 		wrap_tab_action(tabpage, get_codediff_lifecycle, function()
 			deps.view.close_view(get_codediff_lifecycle)
 		end),

@@ -97,6 +97,46 @@ function M.open_status_explorer(repo, focus_file, opts)
 	return tabpage, lifecycle.get_session(tabpage), lifecycle.get_explorer(tabpage)
 end
 
+function M.wait_for_explorer_session(match, timeout_ms, message)
+	local lifecycle = M.get_codediff_lifecycle()
+	local found_tabpage
+	local found_session
+	local found_explorer
+
+	M.wait_for(function()
+		for _, tabpage in ipairs(vim.api.nvim_list_tabpages()) do
+			local session = lifecycle.get_session(tabpage)
+			local explorer = lifecycle.get_explorer(tabpage)
+			if session and explorer and session.mode == "explorer" then
+				local matches = true
+				if match.file_path then
+					matches = matches and explorer.current_file_path == match.file_path
+				end
+				if match.group then
+					matches = matches and explorer.current_file_group == match.group
+				end
+				if match.original_revision then
+					matches = matches and session.original_revision == match.original_revision
+				end
+				if match.modified_revision then
+					matches = matches and session.modified_revision == match.modified_revision
+				end
+
+				if matches then
+					found_tabpage = tabpage
+					found_session = session
+					found_explorer = explorer
+					return true
+				end
+			end
+		end
+
+		return false
+	end, timeout_ms or 15000, message or "CodeDiff explorer session was not ready")
+
+	return found_tabpage, found_session, found_explorer
+end
+
 function M.focus_modified_window(tabpage)
 	local lifecycle = M.get_codediff_lifecycle()
 	local session = lifecycle.get_session(tabpage)
