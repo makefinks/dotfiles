@@ -43,7 +43,7 @@ local function with_cwd(path, callback)
 	return true
 end
 
-local function open_revision_snapshot(snapshot)
+local function open_revision_snapshot_command(snapshot)
 	local original_revision = snapshot.original_revision
 	local modified_revision = snapshot.modified_revision
 	if not original_revision then
@@ -58,6 +58,64 @@ local function open_revision_snapshot(snapshot)
 	return with_cwd(snapshot.repo, function()
 		vim.cmd("CodeDiff " .. table.concat(args, " "))
 	end)
+end
+
+local function open_revision_snapshot(snapshot)
+	if snapshot.hide_untracked == false then
+		return open_revision_snapshot_command(snapshot)
+	end
+
+	local git = helpers.require_module("codediff.core.git", nil, {
+		notify = false,
+		functions = { "get_diff_revision", "get_diff_revisions" },
+	})
+	if not git then
+		return open_revision_snapshot_command(snapshot)
+	end
+
+	local original_get_diff_revision = git.get_diff_revision
+	local original_get_diff_revisions = git.get_diff_revisions
+	local restored = false
+	local group = vim.api.nvim_create_augroup("user_codediff_resume_filter", { clear = true })
+
+	local function restore_git()
+		if restored then
+			return
+		end
+
+		git.get_diff_revision = original_get_diff_revision
+		git.get_diff_revisions = original_get_diff_revisions
+		restored = true
+	end
+
+	local function filter_callback(callback)
+		return function(err, status_result)
+			callback(err, helpers.filter_untracked_status_result(status_result))
+		end
+	end
+
+	git.get_diff_revision = function(revision, git_root, callback)
+		return original_get_diff_revision(revision, git_root, filter_callback(callback))
+	end
+
+	git.get_diff_revisions = function(rev1, rev2, git_root, callback)
+		return original_get_diff_revisions(rev1, rev2, git_root, filter_callback(callback))
+	end
+
+	vim.api.nvim_create_autocmd("User", {
+		group = group,
+		pattern = "CodeDiffOpen",
+		once = true,
+		callback = restore_git,
+	})
+
+	vim.defer_fn(restore_git, 10000)
+	local ok = open_revision_snapshot_command(snapshot)
+	if not ok then
+		restore_git()
+	end
+
+	return ok
 end
 
 local function clamp_cursor_position(bufnr, cursor)
@@ -171,8 +229,8 @@ local function capture_resume_snapshot(session, explorer, cursor)
 		cursor = vim.deepcopy(cursor),
 		hide_untracked = session.hide_untracked ~= false,
 		explorer_hidden = explorer.is_hidden or false,
-		original_revision = session.original_revision,
-		modified_revision = session.modified_revision,
+		original_revision = session.original_revision or explorer.base_revision,
+		modified_revision = session.modified_revision or explorer.target_revision,
 	}
 end
 

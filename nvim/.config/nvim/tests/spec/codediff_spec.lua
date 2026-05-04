@@ -379,6 +379,85 @@ describe("local CodeDiff workflow", function()
 		assert.equals(head_revision, resumed_session.modified_revision)
 	end)
 
+	it("keeps untracked files hidden after resuming revision explorers", function()
+		local view = require("user.codediff.view")
+		local lifecycle = h.get_codediff_lifecycle()
+
+		repo = create_modified_and_untracked_repo()
+		local head_revision = vim.trim(repo.git_ok({ "rev-parse", "HEAD" }))
+		vim.fn.chdir(repo.dir)
+		vim.cmd("CodeDiff HEAD")
+
+		local tabpage
+		local session
+		local explorer
+		h.wait_for(function()
+			for _, current_tabpage in ipairs(vim.api.nvim_list_tabpages()) do
+				local current_session = lifecycle.get_session(current_tabpage)
+				local current_explorer = lifecycle.get_explorer(current_tabpage)
+				if
+					current_session
+					and current_explorer
+					and current_explorer.base_revision == head_revision
+					and current_explorer.target_revision == "WORKING"
+				then
+					tabpage = current_tabpage
+					session = current_session
+					explorer = current_explorer
+					return true
+				end
+			end
+
+			return false
+		end, 15000, "Revision CodeDiff explorer did not open tracked.lua")
+
+		view.set_explorer_options(h.get_codediff_lifecycle, tabpage, {
+			hide_untracked = true,
+		})
+		local tracked_node = h.find_tree_entry(explorer, "tracked.lua", "unstaged")
+		view.select_explorer_file(explorer, tracked_node and tracked_node.data or nil)
+
+		h.wait_for(function()
+			return explorer.current_file_path == "tracked.lua"
+				and session.modified_win
+				and vim.api.nvim_win_is_valid(session.modified_win)
+		end, 10000, "CodeDiff revision modified window was not ready")
+
+		vim.api.nvim_set_current_win(session.modified_win)
+		view.close_view(h.get_codediff_lifecycle)
+
+		h.wait_for(function()
+			return lifecycle.get_session(tabpage) == nil
+		end, 10000, "CodeDiff revision explorer did not close")
+
+		view.resume_last_session(h.get_codediff_lifecycle)
+
+		local resumed_explorer
+		h.wait_for(function()
+			for _, current_tabpage in ipairs(vim.api.nvim_list_tabpages()) do
+				local current_explorer = lifecycle.get_explorer(current_tabpage)
+				if
+					current_explorer
+					and current_explorer.base_revision == head_revision
+					and current_explorer.target_revision == "WORKING"
+					and current_explorer.current_file_path == "tracked.lua"
+				then
+					resumed_explorer = current_explorer
+					return true
+				end
+			end
+
+			return false
+		end, 15000, "CodeDiff did not resume the revision explorer")
+
+		h.wait_for(function()
+			return h.find_tree_entry(resumed_explorer, "tracked.lua", "unstaged")
+				and not h.find_tree_entry(resumed_explorer, "scratch.md", "unstaged")
+		end, 10000, "Resume brought untracked files back into the explorer")
+
+		assert.is_not_nil(explorer)
+	end)
+
 	it("can open the current file with explorer selection and diff focus", function()
 		repo = create_two_modified_files_repo()
 
