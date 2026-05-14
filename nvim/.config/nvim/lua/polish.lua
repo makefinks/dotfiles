@@ -23,8 +23,8 @@ end
 
 local function set_search_hl()
 	vim.api.nvim_set_hl(0, "Search", { fg = "#10131A", bg = "#FFD166", bold = true })
-	vim.api.nvim_set_hl(0, "CurSearch", { fg = "#10131A", bg = "#FF8C42", bold = true })
-	vim.api.nvim_set_hl(0, "IncSearch", { fg = "#10131A", bg = "#FF8C42", bold = true })
+	vim.api.nvim_set_hl(0, "CurSearch", { fg = "#10131A", bg = "#7DCFFF", bold = true })
+	vim.api.nvim_set_hl(0, "IncSearch", { fg = "#10131A", bg = "#7DCFFF", bold = true })
 end
 
 local function set_cursorline_hl()
