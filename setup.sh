@@ -68,28 +68,31 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
 	if command -v apt-get &>/dev/null; then
 		echo "Installing dependencies via apt..."
 		sudo apt-get update
-		sudo apt-get install -y stow neovim tmux zsh git curl npm python3 python3-pip rustc cargo fd-find ripgrep fzf wget imagemagick luarocks shfmt shellcheck
+		sudo apt-get install -y stow neovim tmux zsh git curl nodejs python3 python3-pip python3-pynvim rustc cargo fd-find ripgrep fzf wget imagemagick luarocks shfmt shellcheck
+
+		if ! command -v npm &>/dev/null; then
+			sudo apt-get install -y npm
+		fi
 
 		if ! command -v fd &>/dev/null; then
 			sudo ln -s "$(which fdfind)" /usr/local/bin/fd
 		fi
 
 		echo "Installing neovim language clients..."
-		npm install -g neovim
-		pip3 install pynvim
+		sudo npm install -g neovim
 	elif command -v dnf &>/dev/null; then
 		echo "Installing dependencies via dnf..."
 		sudo dnf install -y stow neovim tmux zsh git curl nodejs python3 python3-pip rust cargo fd-find ripgrep fzf wget ImageMagick luarocks shfmt ShellCheck
 
 		echo "Installing neovim language clients..."
-		npm install -g neovim
+		sudo npm install -g neovim
 		pip3 install pynvim
 	elif command -v pacman &>/dev/null; then
 		echo "Installing dependencies via pacman..."
 		sudo pacman -S --noconfirm stow neovim tmux zsh git curl nodejs python python-pip rust fd ripgrep fzf wget imagemagick luarocks shfmt shellcheck
 
 		echo "Installing neovim language clients..."
-		npm install -g neovim
+		sudo npm install -g neovim
 		pip install pynvim viu
 	else
 		echo "Unsupported package manager. Please install dependencies manually"

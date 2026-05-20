@@ -25,8 +25,8 @@ All of AstroNvim's features for easy configuration and:
 # Prerequisites
 sudo apt update
 sudo apt install -y neovim
-sudo apt install -y npm
-sudo apt install -y python3 python3-pip
+sudo apt install -y nodejs
+sudo apt install -y python3 python3-pip python3-pynvim
 sudo apt install -y rustc cargo
 
 # Additional tools
@@ -42,8 +42,10 @@ sudo apt install -y wget
 sudo apt install -y ripgrep
 
 # Python/Node clients
-npm install -g neovim
-pip install pynvim
+if ! command -v npm &>/dev/null; then
+  sudo apt install -y npm
+fi
+sudo npm install -g neovim
 ```
 
 ---
