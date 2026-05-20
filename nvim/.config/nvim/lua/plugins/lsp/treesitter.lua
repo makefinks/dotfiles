@@ -24,6 +24,7 @@ return {
 				"markdown_inline",
 				"bash",
 				"html",
+				"latex",
 				"css",
 				"toml",
 				"dockerfile",
