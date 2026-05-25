@@ -190,28 +190,4 @@ function M.get_codediff_modules()
 	return codediff_git, view
 end
 
-local function filter_status_entries(entries)
-	local filtered = {}
-
-	for _, entry in ipairs(entries or {}) do
-		if entry.status ~= "??" then
-			filtered[#filtered + 1] = vim.deepcopy(entry)
-		end
-	end
-
-	return filtered
-end
-
-function M.filter_untracked_status_result(status_result)
-	if not status_result then
-		return nil
-	end
-
-	return {
-		unstaged = filter_status_entries(status_result.unstaged),
-		staged = filter_status_entries(status_result.staged),
-		conflicts = filter_status_entries(status_result.conflicts),
-	}
-end
-
 return M

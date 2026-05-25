@@ -1,5 +1,6 @@
 local M = {}
 
+local filters = require("user.codediff.filters")
 local helpers = require("user.codediff.helpers")
 local view = require("user.codediff.view")
 
@@ -90,7 +91,7 @@ local function filter_status_result(explorer, status_result)
 		return status_result
 	end
 
-	return helpers.filter_untracked_status_result(status_result)
+	return filters.untracked_status_result(status_result)
 end
 
 local function find_status_entry(status_result, file_path, preferred_group)

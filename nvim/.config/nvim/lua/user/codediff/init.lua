@@ -5,6 +5,7 @@ local M = {}
 local function get_codediff_modules()
 	return {
 		actions = require("user.codediff.actions"),
+		filters = require("user.codediff.filters"),
 		helpers = require("user.codediff.helpers"),
 		keymaps = require("user.codediff.keymaps"),
 		view = require("user.codediff.view"),
@@ -42,13 +43,13 @@ function M.open_pr_diff_against_branch()
 
 		git.get_status = function(git_root, callback)
 			return original_get_status(git_root, function(err, status_result)
-				callback(err, modules.helpers.filter_untracked_status_result(status_result))
+				callback(err, modules.filters.untracked_status_result(status_result))
 			end)
 		end
 
 		git.get_diff_revision = function(revision, git_root, callback)
 			return original_get_diff_revision(revision, git_root, function(err, status_result)
-				callback(err, modules.helpers.filter_untracked_status_result(status_result))
+				callback(err, modules.filters.untracked_status_result(status_result))
 			end)
 		end
 
