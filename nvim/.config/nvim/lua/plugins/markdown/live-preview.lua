@@ -25,7 +25,5 @@ return {
 	end,
 	keys = {
 		{ "<Leader>mb", start_live_preview, ft = "markdown", desc = "Markdown browser preview" },
-		{ "<LocalLeader>b", start_live_preview, ft = "markdown", desc = "Browser preview" },
-		{ "<LocalLeader>B", "<Cmd>LivePreview close<CR>", ft = "markdown", desc = "Close browser preview" },
 	},
 }
