@@ -18,7 +18,7 @@ function M.open_pr_diff_against_branch()
 	local function open_filtered_command(command)
 		local git = modules.helpers.require_module("codediff.core.git", nil, {
 			notify = false,
-			functions = { "get_status", "get_diff_revision" },
+			functions = { "get_status", "get_diff_revision", "get_diff_revisions" },
 		})
 
 		if not git then
@@ -28,6 +28,7 @@ function M.open_pr_diff_against_branch()
 
 		local original_get_status = git.get_status
 		local original_get_diff_revision = git.get_diff_revision
+		local original_get_diff_revisions = git.get_diff_revisions
 		local restored = false
 		local group = vim.api.nvim_create_augroup("user_codediff_filtered_command", { clear = true })
 
@@ -38,6 +39,7 @@ function M.open_pr_diff_against_branch()
 
 			git.get_status = original_get_status
 			git.get_diff_revision = original_get_diff_revision
+			git.get_diff_revisions = original_get_diff_revisions
 			restored = true
 		end
 
@@ -49,6 +51,12 @@ function M.open_pr_diff_against_branch()
 
 		git.get_diff_revision = function(revision, git_root, callback)
 			return original_get_diff_revision(revision, git_root, function(err, status_result)
+				callback(err, modules.filters.untracked_status_result(status_result))
+			end)
+		end
+
+		git.get_diff_revisions = function(rev1, rev2, git_root, callback)
+			return original_get_diff_revisions(rev1, rev2, git_root, function(err, status_result)
 				callback(err, modules.filters.untracked_status_result(status_result))
 			end)
 		end
@@ -68,29 +76,20 @@ function M.open_pr_diff_against_branch()
 		vim.cmd(command)
 	end
 
-	modules.helpers.with_branch(function(branch)
-		vim.ui.select(
-			{ "PR diff", "Branch vs HEAD", "Branch vs working tree" },
-			{ prompt = "Compare mode:" },
-			function(mode)
-				if not mode then
-					return
-				end
+	vim.ui.select({ "PR diff", "Branch vs working tree" }, { prompt = "Compare mode:" }, function(mode)
+		if not mode then
+			return
+		end
 
-				local escaped_branch = vim.fn.fnameescape(branch)
-				if mode == "PR diff" then
-					open_filtered_command("CodeDiff " .. escaped_branch .. "...")
-					return
-				end
-
-				if mode == "Branch vs HEAD" then
-					open_filtered_command("CodeDiff " .. escaped_branch .. " HEAD")
-					return
-				end
-
-				open_filtered_command("CodeDiff " .. escaped_branch)
+		modules.helpers.with_branch(function(branch)
+			local escaped_branch = vim.fn.fnameescape(branch)
+			if mode == "PR diff" then
+				open_filtered_command("CodeDiff " .. escaped_branch .. "...HEAD")
+				return
 			end
-		)
+
+			open_filtered_command("CodeDiff " .. escaped_branch)
+		end)
 	end)
 end
 

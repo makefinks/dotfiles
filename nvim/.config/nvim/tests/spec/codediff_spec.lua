@@ -91,6 +91,41 @@ local function create_modified_and_untracked_repo()
 	return repo
 end
 
+local function create_pr_diff_repo_with_dirty_worktree()
+	repo = h.create_temp_git_repo()
+	repo.write_file("tracked.lua", { "return 'tracked'" })
+	repo.git_ok({ "add", "." })
+	repo.git_ok({ "commit", "-m", "initial" })
+	repo.git_ok({ "checkout", "-b", "feature" })
+	repo.write_file("feature.lua", { "return 'feature'" })
+	repo.git_ok({ "add", "." })
+	repo.git_ok({ "commit", "-m", "feature" })
+	repo.write_file("tracked.lua", { "return 'dirty worktree'" })
+	return repo
+end
+
+local function with_branch_and_mode(branch, mode, callback)
+	local helpers = require("user.codediff.helpers")
+	local original_with_branch = helpers.with_branch
+	local original_select = vim.ui.select
+
+	helpers.with_branch = function(branch_callback)
+		branch_callback(branch)
+	end
+
+	vim.ui.select = function(_, _, select_callback)
+		select_callback(mode)
+	end
+
+	local ok, err = pcall(callback)
+	helpers.with_branch = original_with_branch
+	vim.ui.select = original_select
+
+	if not ok then
+		error(err)
+	end
+end
+
 describe("local CodeDiff workflow", function()
 	before_each(function()
 		original_cwd = vim.fn.getcwd()
@@ -538,6 +573,23 @@ describe("local CodeDiff workflow", function()
 			return h.find_tree_entry(explorer, "tracked.lua", "unstaged")
 				and not h.find_tree_entry(explorer, "scratch.md", "unstaged")
 		end, 10000, "Refresh brought untracked files back into the explorer")
+	end)
+
+	it("opens PR diffs against HEAD without dirty working tree changes", function()
+		repo = create_pr_diff_repo_with_dirty_worktree()
+		vim.fn.chdir(repo.dir)
+
+		with_branch_and_mode("main", "PR diff", function()
+			require("user.codediff").open_pr_diff_against_branch()
+		end)
+
+		local _, session, explorer =
+			h.wait_for_explorer_session({ file_path = "feature.lua" }, 15000, "PR CodeDiff explorer was not ready")
+
+		assert.is_not_nil(session)
+		assert.are_not.equal("WORKING", session.modified_revision)
+		assert.is_not_nil(h.find_tree_entry(explorer, "feature.lua", "unstaged"))
+		assert.is_nil(h.find_tree_entry(explorer, "tracked.lua", "unstaged"))
 	end)
 
 	it("opens staged added files in an editable real buffer", function()
