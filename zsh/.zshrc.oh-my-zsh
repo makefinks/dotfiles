@@ -9,4 +9,11 @@ plugins=(
 
 source "$ZSH/oh-my-zsh.sh"
 
-[[ -r "$HOME/.config/zsh/va.zsh" ]] && source "$HOME/.config/zsh/va.zsh"
+_dotfiles_zshrc="${(%):-%x}"
+_dotfiles_zshrc_dir="${_dotfiles_zshrc:A:h}"
+if [[ -r "$HOME/.config/zsh/va.zsh" ]]; then
+  source "$HOME/.config/zsh/va.zsh"
+elif [[ -r "$_dotfiles_zshrc_dir/.config/zsh/va.zsh" ]]; then
+  source "$_dotfiles_zshrc_dir/.config/zsh/va.zsh"
+fi
+unset _dotfiles_zshrc _dotfiles_zshrc_dir
