@@ -8,3 +8,5 @@ plugins=(
 )
 
 source "$ZSH/oh-my-zsh.sh"
+
+[[ -r "$HOME/.config/zsh/va.zsh" ]] && source "$HOME/.config/zsh/va.zsh"
