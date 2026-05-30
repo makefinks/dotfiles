@@ -21,6 +21,18 @@ local function create_two_staged_files_repo()
 	return repo
 end
 
+local function create_staged_and_unstaged_repo()
+	repo = h.create_temp_git_repo()
+	repo.write_file("alpha.lua", { "return 'alpha'" })
+	repo.write_file("beta.lua", { "return 'beta'" })
+	repo.git_ok({ "add", "." })
+	repo.git_ok({ "commit", "-m", "initial" })
+	repo.write_file("alpha.lua", { "return 'alpha staged'" })
+	repo.git_ok({ "add", "alpha.lua" })
+	repo.write_file("beta.lua", { "return 'beta unstaged'" })
+	return repo
+end
+
 local function create_staged_added_file_repo()
 	repo = h.create_temp_git_repo()
 	repo.write_file("tracked.lua", { "return 'tracked'" })
@@ -363,6 +375,40 @@ describe("local CodeDiff workflow", function()
 		end, 15000, "CodeDiff did not restore the saved close cursor")
 
 		assert.is_not_nil(resumed_explorer)
+	end)
+
+	it("resumes status explorers with staged and unstaged groups intact", function()
+		local view = require("user.codediff.view")
+		local lifecycle = h.get_codediff_lifecycle()
+
+		repo = create_staged_and_unstaged_repo()
+		local tabpage, _, explorer = h.open_status_explorer(repo, "beta.lua", { hide_untracked = true })
+
+		h.wait_for(function()
+			return explorer.current_file_path == "beta.lua"
+				and explorer.current_file_group == "unstaged"
+				and h.find_tree_entry(explorer, "alpha.lua", "staged")
+				and h.find_tree_entry(explorer, "beta.lua", "unstaged")
+		end, 10000, "CodeDiff did not open the status explorer with both groups")
+
+		view.close_view(h.get_codediff_lifecycle)
+
+		h.wait_for(function()
+			return lifecycle.get_session(tabpage) == nil
+		end, 10000, "CodeDiff did not close")
+
+		view.resume_last_session(h.get_codediff_lifecycle)
+
+		local _, _, resumed_explorer = h.wait_for_explorer_session({
+			file_path = "beta.lua",
+			group = "unstaged",
+		}, 15000, "CodeDiff did not resume the saved status explorer")
+
+		h.wait_for(function()
+			return h.find_tree_entry(resumed_explorer, "alpha.lua", "staged")
+				and h.find_tree_entry(resumed_explorer, "beta.lua", "unstaged")
+				and not h.find_tree_entry(resumed_explorer, "alpha.lua", "unstaged")
+		end, 10000, "Resume did not preserve staged and unstaged status groups")
 	end)
 
 	it("resumes revision explorer sessions with their original revisions", function()

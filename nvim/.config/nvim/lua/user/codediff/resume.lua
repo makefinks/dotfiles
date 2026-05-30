@@ -126,8 +126,8 @@ local function capture_resume_snapshot(session, explorer, cursor)
 		cursor = vim.deepcopy(cursor),
 		hide_untracked = session.hide_untracked ~= false,
 		explorer_hidden = explorer.is_hidden or false,
-		original_revision = session.original_revision or explorer.base_revision,
-		modified_revision = session.modified_revision or explorer.target_revision,
+		original_revision = explorer.base_revision,
+		modified_revision = explorer.target_revision,
 	}
 end
 
