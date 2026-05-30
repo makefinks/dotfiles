@@ -7,8 +7,8 @@ va() {
     return 1
   fi
 
-  local search_root current_dir dir name candidate venv_path selected selected_row label active_marker python_version package_count site_packages sort_key relative_path parent_dir display_row
-  local -a venv_names raw_candidates candidates rows
+  local search_root current_dir search_base dir name candidate venv_path selected selected_row label active_marker python_version package_count site_packages sort_key relative_path parent_dir display_row
+  local -a venv_names search_bases raw_candidates candidates rows
   local -A seen
 
   venv_names=(.venv venv .env env)
@@ -27,15 +27,20 @@ va() {
     dir="${dir:h}"
   done
 
-  if command -v fd >/dev/null 2>&1; then
-    while IFS= read -r candidate; do
-      raw_candidates+=("$candidate")
-    done < <(fd -H -t d --max-depth 5 '^(\.venv|venv|\.env|env)$' "$search_root" 2>/dev/null)
-  else
-    while IFS= read -r candidate; do
-      raw_candidates+=("$candidate")
-    done < <(find "$search_root" -maxdepth 5 -type d \( -name .venv -o -name venv -o -name .env -o -name env \) 2>/dev/null)
-  fi
+  search_bases=("$current_dir")
+  [[ "$search_root" == "$current_dir" ]] || search_bases+=("$search_root")
+
+  for search_base in "${search_bases[@]}"; do
+    if command -v fd >/dev/null 2>&1; then
+      while IFS= read -r candidate; do
+        raw_candidates+=("$candidate")
+      done < <(fd -H -I -t d -t l --max-depth 5 '^(\.venv|venv|\.env|env)$' "$search_base" 2>/dev/null)
+    else
+      while IFS= read -r candidate; do
+        raw_candidates+=("$candidate")
+      done < <(find "$search_base" -maxdepth 5 \( -type d -o -type l \) \( -name .venv -o -name venv -o -name .env -o -name env \) 2>/dev/null)
+    fi
+  done
 
   for candidate in "${raw_candidates[@]}"; do
     venv_path="${candidate:A}"
