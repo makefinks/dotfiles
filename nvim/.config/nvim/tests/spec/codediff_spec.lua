@@ -141,6 +141,7 @@ end
 describe("local CodeDiff workflow", function()
 	before_each(function()
 		original_cwd = vim.fn.getcwd()
+		require("user.codediff.resume").clear_persisted()
 		h.reset_editor()
 		echo_capture = h.capture_echoes()
 	end)
@@ -153,6 +154,7 @@ describe("local CodeDiff workflow", function()
 
 		vim.fn.chdir(original_cwd)
 		h.reset_editor()
+		require("user.codediff.resume").clear_persisted()
 		vim.wait(200)
 
 		if repo then
@@ -612,10 +614,11 @@ describe("local CodeDiff workflow", function()
 		end, 10000, "Resume did not preserve staged and unstaged status groups")
 	end)
 
-	it("resumes reviewed file marks", function()
+	it("resumes reviewed file marks from persisted state", function()
 		local view = require("user.codediff.view")
 		local lifecycle = h.get_codediff_lifecycle()
 		local review = require("user.codediff.review")
+		local resume = require("user.codediff.resume")
 
 		repo = create_two_modified_files_repo()
 		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
@@ -638,6 +641,7 @@ describe("local CodeDiff workflow", function()
 			return lifecycle.get_session(tabpage) == nil
 		end, 10000, "CodeDiff did not close")
 
+		resume.forget_memory()
 		view.resume_last_session(h.get_codediff_lifecycle)
 
 		local resumed_tabpage, _, resumed_explorer = h.wait_for_explorer_session({
@@ -656,6 +660,43 @@ describe("local CodeDiff workflow", function()
 			local state = view.get_statusline_state(resumed_tabpage)
 			return state and state.review_progress == "Reviewed 1/2"
 		end, 10000, "CodeDiff did not restore reviewed progress")
+	end)
+
+	it("resumes persisted state at the first available file when saved file is clean", function()
+		local view = require("user.codediff.view")
+		local lifecycle = h.get_codediff_lifecycle()
+		local review = require("user.codediff.review")
+		local resume = require("user.codediff.resume")
+
+		repo = create_two_modified_files_repo()
+		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+
+		h.wait_for(function()
+			return explorer.current_file_path == "alpha.lua" and explorer.current_file_group == "unstaged"
+		end, 10000, "CodeDiff did not select alpha.lua in the unstaged group")
+
+		review.toggle_current(explorer)
+		view.refresh_statusline(h.get_codediff_lifecycle, tabpage)
+		view.close_view(h.get_codediff_lifecycle)
+
+		h.wait_for(function()
+			return lifecycle.get_session(tabpage) == nil
+		end, 10000, "CodeDiff did not close")
+
+		repo.git_ok({ "checkout", "--", "alpha.lua" })
+		resume.forget_memory()
+		view.resume_last_session(h.get_codediff_lifecycle)
+
+		local resumed_tabpage, _, resumed_explorer = h.wait_for_explorer_session({
+			file_path = "beta.lua",
+			group = "unstaged",
+		}, 15000, "CodeDiff did not resume at the remaining changed file")
+
+		assert.is_false(review.is_reviewed(resumed_explorer, { path = "beta.lua", group = "unstaged" }))
+		h.wait_for(function()
+			local state = view.get_statusline_state(resumed_tabpage)
+			return state and state.review_progress == "Reviewed 0/1"
+		end, 10000, "CodeDiff counted stale reviewed marks")
 	end)
 
 	it("resumes revision explorer sessions with their original revisions", function()

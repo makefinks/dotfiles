@@ -3,10 +3,123 @@ local review = require("user.codediff.review")
 
 local M = {}
 
+local SNAPSHOT_VERSION = 1
 local last_resume_snapshot = nil
 
 local function path_exists(path)
 	return path and vim.uv.fs_stat(path) ~= nil
+end
+
+local function get_state_path()
+	if vim.g.user_codediff_resume_path and vim.g.user_codediff_resume_path ~= "" then
+		return vim.g.user_codediff_resume_path
+	end
+
+	return table.concat({ vim.fn.stdpath("state"), "codediff-review", "resume.json" }, "/")
+end
+
+local function clear_persisted_snapshot()
+	pcall(vim.fn.delete, get_state_path())
+end
+
+local function normalize_cursor(cursor)
+	if type(cursor) ~= "table" then
+		return { 1, 0 }
+	end
+
+	return {
+		type(cursor[1]) == "number" and cursor[1] or 1,
+		type(cursor[2]) == "number" and cursor[2] or 0,
+	}
+end
+
+local function normalize_snapshot(snapshot)
+	if type(snapshot) ~= "table" then
+		return nil
+	end
+
+	if type(snapshot.repo) ~= "string" or snapshot.repo == "" then
+		return nil
+	end
+
+	if type(snapshot.file_path) ~= "string" or snapshot.file_path == "" then
+		return nil
+	end
+
+	if type(snapshot.group) ~= "string" or snapshot.group == "" then
+		return nil
+	end
+
+	return {
+		repo = snapshot.repo,
+		file_path = snapshot.file_path,
+		group = snapshot.group,
+		cursor = normalize_cursor(snapshot.cursor),
+		reviewed = type(snapshot.reviewed) == "table" and snapshot.reviewed or nil,
+		hide_untracked = snapshot.hide_untracked ~= false,
+		explorer_hidden = snapshot.explorer_hidden == true,
+		original_revision = type(snapshot.original_revision) == "string" and snapshot.original_revision or nil,
+		modified_revision = type(snapshot.modified_revision) == "string" and snapshot.modified_revision or nil,
+	}
+end
+
+local function load_persisted_snapshot()
+	local path = get_state_path()
+	if not path_exists(path) then
+		return nil
+	end
+
+	local ok_read, lines = pcall(vim.fn.readfile, path)
+	if not ok_read then
+		clear_persisted_snapshot()
+		return nil
+	end
+
+	local ok_decode, payload = pcall(vim.json.decode, table.concat(lines, "\n"))
+	if not ok_decode or type(payload) ~= "table" or payload.version ~= SNAPSHOT_VERSION then
+		clear_persisted_snapshot()
+		return nil
+	end
+
+	local snapshot = normalize_snapshot(payload.snapshot)
+	if not snapshot then
+		clear_persisted_snapshot()
+	end
+
+	return snapshot
+end
+
+local function persist_snapshot(snapshot)
+	local path = get_state_path()
+	local dir = vim.fn.fnamemodify(path, ":h")
+	local payload = {
+		version = SNAPSHOT_VERSION,
+		saved_at = os.time(),
+		snapshot = snapshot,
+	}
+
+	local ok_encode, encoded = pcall(vim.json.encode, payload)
+	if not ok_encode then
+		return
+	end
+
+	local ok_write = pcall(function()
+		vim.fn.mkdir(dir, "p")
+		vim.fn.writefile({ encoded }, path)
+	end)
+
+	if not ok_write then
+		vim.notify("Failed to persist CodeDiff resume state", vim.log.levels.WARN)
+	end
+end
+
+local function is_git_repo(path)
+	if not path_exists(path) then
+		return false
+	end
+
+	vim.fn.systemlist({ "git", "-C", path, "rev-parse", "--show-toplevel" })
+	return vim.v.shell_error == 0
 end
 
 local function with_cwd(path, callback)
@@ -120,7 +233,7 @@ local function capture_resume_snapshot(session, explorer, cursor)
 		return
 	end
 
-	last_resume_snapshot = {
+	return {
 		repo = explorer.git_root,
 		file_path = file_path,
 		group = group,
@@ -171,7 +284,13 @@ function M.save(get_codediff_lifecycle, tabpage, cursor)
 		return
 	end
 
-	capture_resume_snapshot(session, explorer, cursor or get_resume_cursor(session))
+	local snapshot = capture_resume_snapshot(session, explorer, cursor or get_resume_cursor(session))
+	if not snapshot then
+		return
+	end
+
+	last_resume_snapshot = snapshot
+	persist_snapshot(snapshot)
 	session._user_resume_snapshot_saved = true
 end
 
@@ -254,19 +373,23 @@ local function apply_snapshot(get_codediff_lifecycle, snapshot, deps, attempt)
 end
 
 function M.resume(get_codediff_lifecycle, deps)
-	local snapshot = last_resume_snapshot
+	local snapshot = last_resume_snapshot or load_persisted_snapshot()
 	if not snapshot then
 		vim.notify("No previous CodeDiff session to resume", vim.log.levels.WARN)
 		return
 	end
 
-	if not path_exists(snapshot.repo) then
+	if not is_git_repo(snapshot.repo) then
 		vim.notify(string.format("CodeDiff repo is no longer available: %s", snapshot.repo), vim.log.levels.WARN)
+		M.clear_persisted()
 		return
 	end
 
+	last_resume_snapshot = snapshot
+
 	if snapshot.original_revision then
 		if not open_revision_snapshot(snapshot) then
+			M.clear_persisted()
 			return
 		end
 	else
@@ -288,5 +411,16 @@ function M.resume(get_codediff_lifecycle, deps)
 		apply_snapshot(get_codediff_lifecycle, snapshot, deps)
 	end, 80)
 end
+
+function M.clear_persisted()
+	last_resume_snapshot = nil
+	clear_persisted_snapshot()
+end
+
+function M.forget_memory()
+	last_resume_snapshot = nil
+end
+
+last_resume_snapshot = load_persisted_snapshot()
 
 return M

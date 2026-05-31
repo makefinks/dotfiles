@@ -7,6 +7,7 @@ vim.opt.laststatus = 0
 
 vim.g.mapleader = " "
 vim.g.maplocalleader = ","
+vim.g.user_codediff_resume_path = vim.fn.tempname() .. "/resume.json"
 
 local cwd = vim.fn.getcwd()
 local lazy_root = vim.fn.stdpath("data") .. "/lazy"
