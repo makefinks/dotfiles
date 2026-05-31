@@ -27,6 +27,11 @@ return {
 				return view and view.get_statusline_hunk_progress and view.get_statusline_hunk_progress() or nil
 			end
 
+			local function review_progress()
+				local state = codediff_statusline_state()
+				return state and state.review_progress or vim.b.codediff_review_progress
+			end
+
 			opts.statusline = {
 				-- default highlight for the entire statusline
 				hl = { fg = "fg", bg = "bg" },
@@ -181,11 +186,13 @@ return {
 						provider = function()
 							local hunk = hunk_progress()
 							local progress = codediff_statusline_progress()
+							local reviewed = review_progress()
+							local suffix = reviewed and ("  " .. reviewed) or ""
 							if hunk then
-								return string.format("File %s  Hunk %s", progress, hunk)
+								return string.format("File %s  Hunk %s%s", progress, hunk, suffix)
 							end
 
-							return "File " .. progress
+							return "File " .. progress .. suffix
 						end,
 					},
 					condition = function()

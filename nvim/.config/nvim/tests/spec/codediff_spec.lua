@@ -221,6 +221,58 @@ describe("local CodeDiff workflow", function()
 		assert.is_not_nil(h.find_tree_entry(explorer, "beta.lua", "staged"))
 	end)
 
+	it("stages visually selected explorer files", function()
+		repo = create_two_modified_files_repo()
+		local _, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+
+		h.wait_for(function()
+			return explorer.current_file_path == "alpha.lua"
+				and h.find_tree_entry(explorer, "alpha.lua", "unstaged")
+				and h.find_tree_entry(explorer, "beta.lua", "unstaged")
+		end, 10000, "CodeDiff did not open both unstaged files")
+
+		local alpha_line = h.find_tree_line(explorer, "alpha.lua", "unstaged")
+		local beta_line = h.find_tree_line(explorer, "beta.lua", "unstaged")
+		assert.is_not_nil(alpha_line)
+		assert.is_not_nil(beta_line)
+
+		h.invoke_visual_keymap(explorer, alpha_line, beta_line, "s")
+
+		h.wait_for(function()
+			local status_result = explorer.status_result
+			return h.status_has_path(status_result, "staged", "alpha.lua")
+				and h.status_has_path(status_result, "staged", "beta.lua")
+				and not h.status_has_path(status_result, "unstaged", "alpha.lua")
+				and not h.status_has_path(status_result, "unstaged", "beta.lua")
+		end, 15000, "Visual CodeDiff stage did not stage selected files")
+	end)
+
+	it("unstages visually selected explorer files", function()
+		repo = create_two_staged_files_repo()
+		local _, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+
+		h.wait_for(function()
+			return explorer.current_file_path == "alpha.lua"
+				and h.find_tree_entry(explorer, "alpha.lua", "staged")
+				and h.find_tree_entry(explorer, "beta.lua", "staged")
+		end, 10000, "CodeDiff did not open both staged files")
+
+		local alpha_line = h.find_tree_line(explorer, "alpha.lua", "staged")
+		local beta_line = h.find_tree_line(explorer, "beta.lua", "staged")
+		assert.is_not_nil(alpha_line)
+		assert.is_not_nil(beta_line)
+
+		h.invoke_visual_keymap(explorer, alpha_line, beta_line, "u")
+
+		h.wait_for(function()
+			local status_result = explorer.status_result
+			return h.status_has_path(status_result, "unstaged", "alpha.lua")
+				and h.status_has_path(status_result, "unstaged", "beta.lua")
+				and not h.status_has_path(status_result, "staged", "alpha.lua")
+				and not h.status_has_path(status_result, "staged", "beta.lua")
+		end, 15000, "Visual CodeDiff unstage did not unstage selected files")
+	end)
+
 	it("rebinds diff-buffer mappings after staging advances to the next file", function()
 		local actions = require("user.codediff.actions")
 
@@ -257,6 +309,155 @@ describe("local CodeDiff workflow", function()
 			assert.is_false(h.buffer_has_keymap(first_modified_bufnr, "<leader>gz"))
 			assert.is_false(h.buffer_has_keymap(first_modified_bufnr, "ff"))
 		end
+	end)
+
+	it("marks files reviewed and advances to the next unreviewed file from diff buffers", function()
+		repo = create_two_modified_files_repo()
+		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+
+		h.wait_for(function()
+			return explorer.current_file_path == "alpha.lua" and explorer.current_file_group == "unstaged"
+		end, 10000, "CodeDiff did not select alpha.lua in the unstaged group")
+
+		local modified_bufnr
+		h.wait_for(function()
+			modified_bufnr = h.focus_modified_window(tabpage)
+			return h.buffer_has_keymap(modified_bufnr, "r") and h.buffer_has_keymap(modified_bufnr, "]r")
+		end, 10000, "CodeDiff review mappings were not ready")
+
+		vim.api.nvim_buf_call(modified_bufnr, function()
+			vim.fn.maparg("r", "n", false, true).callback()
+		end)
+
+		h.wait_for(function()
+			local state = require("user.codediff.view").get_statusline_state(tabpage)
+			return state
+				and state.review_progress == "Reviewed 1/2"
+				and explorer.current_file_path == "beta.lua"
+				and explorer.current_file_group == "unstaged"
+		end, 10000, "CodeDiff did not mark alpha.lua reviewed and advance to beta.lua")
+	end)
+
+	it("clears reviewed marks", function()
+		repo = create_two_modified_files_repo()
+		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+
+		h.wait_for(function()
+			return explorer.current_file_path == "alpha.lua" and explorer.current_file_group == "unstaged"
+		end, 10000, "CodeDiff did not select alpha.lua in the unstaged group")
+
+		local review = require("user.codediff.review")
+		review.toggle_current(explorer)
+		require("user.codediff.view").refresh_statusline(h.get_codediff_lifecycle, tabpage)
+
+		h.wait_for(function()
+			local state = require("user.codediff.view").get_statusline_state(tabpage)
+			return state and state.review_progress == "Reviewed 1/2"
+		end, 10000, "CodeDiff did not record a reviewed mark")
+
+		review.clear(explorer)
+		require("user.codediff.view").refresh_statusline(h.get_codediff_lifecycle, tabpage)
+
+		h.wait_for(function()
+			local state = require("user.codediff.view").get_statusline_state(tabpage)
+			return state and state.review_progress == "Reviewed 0/2"
+		end, 10000, "CodeDiff did not clear reviewed marks")
+	end)
+
+	it("marks the explorer cursor file reviewed instead of the selected diff file", function()
+		repo = create_two_modified_files_repo()
+		local _, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+
+		h.wait_for(function()
+			return explorer.current_file_path == "alpha.lua" and explorer.current_file_group == "unstaged"
+		end, 10000, "CodeDiff did not select alpha.lua in the unstaged group")
+
+		local beta_line = h.find_tree_line(explorer, "beta.lua", "unstaged")
+		assert.is_not_nil(beta_line)
+		local alpha_line = h.find_tree_line(explorer, "alpha.lua", "unstaged")
+		assert.is_not_nil(alpha_line)
+
+		vim.api.nvim_set_current_buf(explorer.bufnr)
+		vim.api.nvim_win_set_cursor(0, { beta_line, 0 })
+		vim.fn.maparg("r", "n", false, true).callback()
+
+		local review = require("user.codediff.review")
+		assert.is_false(review.is_reviewed(explorer, { path = "alpha.lua", group = "unstaged" }))
+		assert.is_true(review.is_reviewed(explorer, { path = "beta.lua", group = "unstaged" }))
+		assert.is_false(h.line_has_review_mark(explorer, alpha_line))
+		assert.is_true(h.line_has_review_mark(explorer, beta_line))
+
+		explorer.tree:render()
+		assert.is_false(h.line_has_review_mark(explorer, alpha_line))
+		assert.is_true(h.line_has_review_mark(explorer, beta_line))
+	end)
+
+	it("keeps reviewed background off the selected explorer row", function()
+		repo = create_two_modified_files_repo()
+		local _, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+
+		h.wait_for(function()
+			return explorer.current_file_path == "alpha.lua"
+				and h.find_tree_entry(explorer, "alpha.lua", "unstaged")
+				and h.find_tree_entry(explorer, "beta.lua", "unstaged")
+		end, 10000, "CodeDiff did not open both unstaged files")
+
+		local alpha_line = h.find_tree_line(explorer, "alpha.lua", "unstaged")
+		local beta_line = h.find_tree_line(explorer, "beta.lua", "unstaged")
+		assert.is_not_nil(alpha_line)
+		assert.is_not_nil(beta_line)
+
+		local review = require("user.codediff.review")
+		review.toggle_files(explorer, {
+			{ path = "alpha.lua", group = "unstaged" },
+			{ path = "beta.lua", group = "unstaged" },
+		})
+		vim.api.nvim_set_current_win(explorer.winid)
+		vim.api.nvim_win_set_cursor(explorer.winid, { beta_line, 0 })
+		review.render(explorer)
+
+		local namespace = review.get_namespace()
+		local function has_review_background(line)
+			local marks = vim.api.nvim_buf_get_extmarks(explorer.bufnr, namespace, 0, -1, { details = true })
+			for _, mark in ipairs(marks) do
+				local details = mark[4]
+				if mark[2] == line - 1 and details and details.line_hl_group == "UserCodeDiffReviewed" then
+					return true
+				end
+			end
+
+			return false
+		end
+
+		assert.is_false(has_review_background(alpha_line))
+		assert.is_true(has_review_background(beta_line))
+	end)
+
+	it("marks visually selected explorer files reviewed", function()
+		repo = create_two_modified_files_repo()
+		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+
+		h.wait_for(function()
+			return explorer.current_file_path == "alpha.lua"
+				and h.find_tree_entry(explorer, "alpha.lua", "unstaged")
+				and h.find_tree_entry(explorer, "beta.lua", "unstaged")
+		end, 10000, "CodeDiff did not open both unstaged files")
+
+		local alpha_line = h.find_tree_line(explorer, "alpha.lua", "unstaged")
+		local beta_line = h.find_tree_line(explorer, "beta.lua", "unstaged")
+		assert.is_not_nil(alpha_line)
+		assert.is_not_nil(beta_line)
+
+		h.invoke_visual_keymap(explorer, alpha_line, beta_line, "r")
+
+		local review = require("user.codediff.review")
+		assert.is_true(review.is_reviewed(explorer, { path = "alpha.lua", group = "unstaged" }))
+		assert.is_true(review.is_reviewed(explorer, { path = "beta.lua", group = "unstaged" }))
+		assert.is_true(h.line_has_review_mark(explorer, alpha_line))
+		assert.is_true(h.line_has_review_mark(explorer, beta_line))
+
+		local state = require("user.codediff.view").get_statusline_state(tabpage)
+		assert.equals("Reviewed 2/2", state and state.review_progress)
 	end)
 
 	it("closes codediff and opens the working tree file at the diff cursor", function()
@@ -409,6 +610,52 @@ describe("local CodeDiff workflow", function()
 				and h.find_tree_entry(resumed_explorer, "beta.lua", "unstaged")
 				and not h.find_tree_entry(resumed_explorer, "alpha.lua", "unstaged")
 		end, 10000, "Resume did not preserve staged and unstaged status groups")
+	end)
+
+	it("resumes reviewed file marks", function()
+		local view = require("user.codediff.view")
+		local lifecycle = h.get_codediff_lifecycle()
+		local review = require("user.codediff.review")
+
+		repo = create_two_modified_files_repo()
+		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+
+		h.wait_for(function()
+			return explorer.current_file_path == "alpha.lua" and explorer.current_file_group == "unstaged"
+		end, 10000, "CodeDiff did not select alpha.lua in the unstaged group")
+
+		review.toggle_current(explorer)
+		view.refresh_statusline(h.get_codediff_lifecycle, tabpage)
+
+		h.wait_for(function()
+			local state = view.get_statusline_state(tabpage)
+			return state and state.review_progress == "Reviewed 1/2"
+		end, 10000, "CodeDiff did not mark alpha.lua as reviewed")
+
+		view.close_view(h.get_codediff_lifecycle)
+
+		h.wait_for(function()
+			return lifecycle.get_session(tabpage) == nil
+		end, 10000, "CodeDiff did not close")
+
+		view.resume_last_session(h.get_codediff_lifecycle)
+
+		local resumed_tabpage, _, resumed_explorer = h.wait_for_explorer_session({
+			file_path = "alpha.lua",
+			group = "unstaged",
+		}, 15000, "CodeDiff did not resume the reviewed session")
+
+		local alpha_line = h.find_tree_line(resumed_explorer, "alpha.lua", "unstaged")
+		assert.is_not_nil(alpha_line)
+		h.wait_for(function()
+			return review.is_reviewed(resumed_explorer, { path = "alpha.lua", group = "unstaged" })
+				and h.line_has_review_mark(resumed_explorer, alpha_line)
+		end, 10000, "CodeDiff did not restore reviewed marks")
+
+		h.wait_for(function()
+			local state = view.get_statusline_state(resumed_tabpage)
+			return state and state.review_progress == "Reviewed 1/2"
+		end, 10000, "CodeDiff did not restore reviewed progress")
 	end)
 
 	it("resumes revision explorer sessions with their original revisions", function()

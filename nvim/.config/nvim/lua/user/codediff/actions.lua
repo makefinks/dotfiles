@@ -1,7 +1,9 @@
 local M = {}
 
+local adapter = require("user.codediff.adapter")
 local filters = require("user.codediff.filters")
 local helpers = require("user.codediff.helpers")
+local review = require("user.codediff.review")
 local view = require("user.codediff.view")
 
 local function normalize_repo_relative_path(git_root, path)
@@ -144,9 +146,8 @@ local function clear_current_selection(explorer)
 end
 
 local function show_welcome_page(explorer)
-	local render = helpers.require_module("codediff.ui.explorer.render", nil, {
+	local render = adapter.explorer_render(nil, "show_welcome_page", {
 		notify = false,
-		functions = "show_welcome_page",
 	})
 	if render then
 		render.show_welcome_page(explorer)
@@ -169,11 +170,8 @@ local function rebuild_hidden_tree(explorer, status_result)
 		return false
 	end
 
-	local tree_module =
-		helpers.require_module("codediff.ui.explorer.tree", "Failed to rebuild codediff explorer state", {
-			functions = "create_tree_data",
-		})
-	local config = helpers.require_module("codediff.config", "Failed to rebuild codediff explorer state")
+	local tree_module = adapter.explorer_tree("Failed to rebuild codediff explorer state", "create_tree_data")
+	local config = adapter.config("Failed to rebuild codediff explorer state")
 	if not tree_module or not config then
 		return false
 	end
@@ -220,9 +218,7 @@ local function rebuild_hidden_tree(explorer, status_result)
 end
 
 local function refresh_hidden_explorer(explorer, next_file)
-	local git = helpers.require_module("codediff.core.git", "Failed to refresh codediff explorer", {
-		functions = "get_status",
-	})
+	local git = adapter.git("Failed to refresh codediff explorer", "get_status")
 	if not git then
 		return
 	end
@@ -253,15 +249,20 @@ local function refresh_hidden_explorer(explorer, next_file)
 end
 
 local function refresh_visible_explorer(explorer, next_file)
-	local refresh = helpers.require_module("codediff.ui.explorer.refresh", "Failed to refresh codediff explorer", {
-		functions = "refresh",
-	})
+	local refresh = adapter.explorer_refresh("Failed to refresh codediff explorer", "refresh")
 	if not refresh then
 		return
 	end
 
 	reconcile_selection(explorer, next_file)
 	refresh.refresh(explorer)
+end
+
+local function refresh_explorer(explorer)
+	local refresh = adapter.explorer_refresh("Failed to refresh codediff explorer", "refresh")
+	if refresh then
+		refresh.refresh(explorer)
+	end
 end
 
 local function refresh_after_group_action(explorer, next_file)
@@ -296,16 +297,12 @@ local function get_stage_context(get_codediff_lifecycle, tabpage)
 		return nil
 	end
 
-	local explorer_ui = helpers.require_module("codediff.ui.explorer", "Failed to load codediff explorer", {
-		functions = "toggle_stage_entry",
-	})
+	local explorer_ui = adapter.explorer("Failed to load codediff explorer", "toggle_stage_entry")
 	if not explorer_ui then
 		return nil
 	end
 
-	local git = helpers.require_module("codediff.core.git", "Failed to load codediff git helpers", {
-		functions = { "stage_file", "unstage_file" },
-	})
+	local git = adapter.git("Failed to load codediff git helpers", { "stage_file", "unstage_file" })
 	if not git then
 		return nil
 	end
@@ -391,6 +388,64 @@ local function get_restore_context(get_codediff_lifecycle, tabpage)
 	return context
 end
 
+local function get_visual_stage_context(get_codediff_lifecycle, tabpage)
+	local lifecycle = get_codediff_lifecycle()
+	if not lifecycle then
+		return nil
+	end
+
+	local session = lifecycle.get_session(tabpage)
+	local explorer = lifecycle.get_explorer(tabpage)
+	if not session or session.mode ~= "explorer" or not explorer or not explorer.git_root then
+		return nil
+	end
+
+	if not explorer.bufnr or vim.api.nvim_get_current_buf() ~= explorer.bufnr then
+		return nil
+	end
+
+	local git = adapter.git("Failed to load codediff git helpers", { "stage_file", "unstage_file" })
+	if not git then
+		return nil
+	end
+
+	return {
+		explorer = explorer,
+		git = git,
+	}
+end
+
+local function run_batch_stage_action(explorer, files, action)
+	if #files == 0 then
+		return
+	end
+
+	local index = 1
+	local function run_next()
+		local file_data = files[index]
+		if not file_data then
+			vim.schedule(function()
+				refresh_explorer(explorer)
+			end)
+			return
+		end
+
+		action(explorer.git_root, file_data.path, function(err)
+			if helpers.handle_async_error(err) then
+				vim.schedule(function()
+					refresh_explorer(explorer)
+				end)
+				return
+			end
+
+			index = index + 1
+			run_next()
+		end)
+	end
+
+	run_next()
+end
+
 -- Stage the current file or directory and advance selection when possible.
 function M.stage_entry(get_codediff_lifecycle, tabpage)
 	local context = get_stage_context(get_codediff_lifecycle, tabpage)
@@ -469,6 +524,38 @@ function M.unstage_entry(get_codediff_lifecycle, tabpage)
 	end)
 end
 
+function M.stage_entries(get_codediff_lifecycle, tabpage, start_line, end_line)
+	local context = get_visual_stage_context(get_codediff_lifecycle, tabpage)
+	if not context then
+		return
+	end
+
+	local files = {}
+	for _, file_data in ipairs(review.get_files_in_range(context.explorer, start_line, end_line)) do
+		if file_data.group == "unstaged" or file_data.group == "conflicts" then
+			files[#files + 1] = file_data
+		end
+	end
+
+	run_batch_stage_action(context.explorer, files, context.git.stage_file)
+end
+
+function M.unstage_entries(get_codediff_lifecycle, tabpage, start_line, end_line)
+	local context = get_visual_stage_context(get_codediff_lifecycle, tabpage)
+	if not context then
+		return
+	end
+
+	local files = {}
+	for _, file_data in ipairs(review.get_files_in_range(context.explorer, start_line, end_line)) do
+		if file_data.group == "staged" then
+			files[#files + 1] = file_data
+		end
+	end
+
+	run_batch_stage_action(context.explorer, files, context.git.unstage_file)
+end
+
 -- Toggle between staged and unstaged state based on the current file group.
 function M.toggle_stage(get_codediff_lifecycle, tabpage)
 	local context = get_stage_context(get_codediff_lifecycle, tabpage)
@@ -492,10 +579,7 @@ function M.restore_entry(get_codediff_lifecycle, tabpage)
 		return
 	end
 
-	local action_mod =
-		helpers.require_module("codediff.ui.explorer.actions", "Failed to load codediff explorer actions", {
-			functions = "restore_entry",
-		})
+	local action_mod = adapter.explorer_actions("Failed to load codediff explorer actions", "restore_entry")
 	if not action_mod then
 		return
 	end
@@ -505,12 +589,8 @@ function M.restore_entry(get_codediff_lifecycle, tabpage)
 		return
 	end
 
-	local git = helpers.require_module("codediff.core.git", "Failed to load codediff discard helpers", {
-		functions = { "delete_untracked", "restore_file" },
-	})
-	local refresh = helpers.require_module("codediff.ui.explorer.refresh", "Failed to load codediff discard helpers", {
-		functions = "refresh",
-	})
+	local git = adapter.git("Failed to load codediff discard helpers", { "delete_untracked", "restore_file" })
+	local refresh = adapter.explorer_refresh("Failed to load codediff discard helpers", "refresh")
 	if not git or not refresh then
 		return
 	end
@@ -593,7 +673,9 @@ function M.open_file_picker(get_codediff_lifecycle, tabpage)
 				staged = fzf_utils.ansi_codes.blue(group.label),
 			})[group.key] or group.label
 
-			local label = string.format("%d\t%s\t%s\t%s", index, file.path, group_label, details)
+			local reviewed = review.is_reviewed(explorer, vim.tbl_extend("force", file, { group = group.key }))
+			local review_label = reviewed and "[x]" or "[ ]"
+			local label = string.format("%d\t%s\t%s\t%s\t%s", index, review_label, file.path, group_label, details)
 			entries[#entries + 1] = label
 			entry_by_index[index] = {
 				path = file.path,
@@ -617,7 +699,7 @@ function M.open_file_picker(get_codediff_lifecycle, tabpage)
 		},
 		fzf_opts = {
 			["--delimiter"] = "\t",
-			["--with-nth"] = "2,3,4",
+			["--with-nth"] = "2,3,4,5",
 		},
 		previewer = false,
 		actions = {

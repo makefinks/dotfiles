@@ -196,6 +196,54 @@ function M.find_tree_entry(explorer, path, group)
 	return nil
 end
 
+function M.find_tree_line(explorer, path, group)
+	if not explorer or not explorer.bufnr or not vim.api.nvim_buf_is_valid(explorer.bufnr) then
+		return nil
+	end
+
+	for line = 1, vim.api.nvim_buf_line_count(explorer.bufnr) do
+		local node = explorer.tree:get_node(line)
+		if node and node.data and node.data.path == path and node.data.group == group then
+			return line
+		end
+	end
+
+	return nil
+end
+
+function M.line_has_review_mark(explorer, line)
+	local namespace = require("user.codediff.review").get_namespace()
+	local marks = vim.api.nvim_buf_get_extmarks(explorer.bufnr, namespace, 0, -1, {
+		details = true,
+	})
+
+	for _, mark in ipairs(marks) do
+		if mark[2] == line - 1 then
+			return true
+		end
+	end
+
+	return false
+end
+
+function M.invoke_visual_keymap(explorer, start_line, end_line, lhs)
+	assert(
+		explorer and explorer.winid and vim.api.nvim_win_is_valid(explorer.winid),
+		"CodeDiff explorer window missing"
+	)
+	vim.api.nvim_set_current_win(explorer.winid)
+	vim.api.nvim_win_set_cursor(explorer.winid, { start_line, 0 })
+	vim.cmd("normal! V")
+	vim.api.nvim_win_set_cursor(explorer.winid, { end_line, 0 })
+
+	local keymap = vim.fn.maparg(lhs, "x", false, true)
+	assert(type(keymap) == "table" and type(keymap.callback) == "function", "Visual keymap missing: " .. lhs)
+	keymap.callback()
+
+	local escape = vim.api.nvim_replace_termcodes("<Esc>", true, false, true)
+	vim.api.nvim_feedkeys(escape, "nx", false)
+end
+
 function M.buffer_has_keymap(bufnr, lhs)
 	if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
 		return false

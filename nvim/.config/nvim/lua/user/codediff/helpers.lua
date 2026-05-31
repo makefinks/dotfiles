@@ -167,27 +167,4 @@ function M.open_branch_preview(repo, rel, filetype, branch, split_mode)
 	end, { buffer = buf, silent = true, desc = "Close branch preview buffer" })
 end
 
--- Load the codediff modules we depend on and verify the expected API is present.
-function M.get_codediff_modules()
-	local codediff_git = M.require_module("codediff.core.git", nil, {
-		notify = false,
-		functions = "get_status",
-	})
-	if not codediff_git then
-		M.notify_error("failed to load or validate codediff.core.git")
-		return nil, nil
-	end
-
-	local view = M.require_module("codediff.ui.view", nil, {
-		notify = false,
-		functions = "create",
-	})
-	if not view then
-		M.notify_error("failed to load or validate codediff.ui.view")
-		return nil, nil
-	end
-
-	return codediff_git, view
-end
-
 return M

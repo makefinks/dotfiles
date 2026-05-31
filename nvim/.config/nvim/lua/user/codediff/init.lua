@@ -1,13 +1,17 @@
 local get_codediff_lifecycle
 
+local adapter = require("user.codediff.adapter")
+
 local M = {}
 
 local function get_codediff_modules()
 	return {
 		actions = require("user.codediff.actions"),
+		adapter = adapter,
 		filters = require("user.codediff.filters"),
 		helpers = require("user.codediff.helpers"),
 		keymaps = require("user.codediff.keymaps"),
+		review = require("user.codediff.review"),
 		view = require("user.codediff.view"),
 	}
 end
@@ -16,9 +20,8 @@ function M.open_pr_diff_against_branch()
 	local modules = get_codediff_modules()
 
 	local function open_filtered_command(command)
-		local git = modules.helpers.require_module("codediff.core.git", nil, {
+		local git = modules.adapter.git(nil, { "get_status", "get_diff_revision", "get_diff_revisions" }, {
 			notify = false,
-			functions = { "get_status", "get_diff_revision", "get_diff_revisions" },
 		})
 
 		if not git then
@@ -95,7 +98,7 @@ end
 
 -- Safely access the active codediff lifecycle module.
 get_codediff_lifecycle = function()
-	return require("user.codediff.helpers").require_module("codediff.ui.lifecycle", "Codediff is not available")
+	return adapter.lifecycle()
 end
 
 function M.current_file_diff()
@@ -169,9 +172,12 @@ function M.setup()
 	local modules = get_codediff_modules()
 	local keymap_deps = {
 		actions = modules.actions,
+		review = modules.review,
 		view = modules.view,
 	}
 
+	-- This is intentionally a review workflow layer over CodeDiff internals: keep adapter.lua
+	-- as the compatibility boundary for upstream API changes.
 	modules.view.install_refresh_filter()
 	modules.keymaps.install_buffer_update_hook(get_codediff_lifecycle, keymap_deps)
 

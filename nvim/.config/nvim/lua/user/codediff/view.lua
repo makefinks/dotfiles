@@ -1,7 +1,9 @@
 local M = {}
 
+local adapter = require("user.codediff.adapter")
 local filters = require("user.codediff.filters")
 local helpers = require("user.codediff.helpers")
+local review = require("user.codediff.review")
 local resume = require("user.codediff.resume")
 
 local statusline_state_by_tabpage = {}
@@ -69,9 +71,8 @@ local function get_explorer_file_position(explorer)
 		return nil
 	end
 
-	local refresh = helpers.require_module("codediff.ui.explorer.refresh", nil, {
+	local refresh = adapter.explorer_refresh(nil, "get_all_files", {
 		notify = false,
-		functions = "get_all_files",
 	})
 	if not refresh then
 		return nil
@@ -102,7 +103,7 @@ local function show_added_file_as_editable(tabpage, explorer, file_data)
 		return false
 	end
 
-	local lifecycle = helpers.get_loaded_module("codediff.ui.lifecycle")
+	local lifecycle = adapter.loaded_lifecycle()
 	if not lifecycle then
 		return false
 	end
@@ -121,9 +122,8 @@ local function show_added_file_as_editable(tabpage, explorer, file_data)
 		end
 
 		if current_session.layout == "inline" then
-			local inline_view = helpers.require_module("codediff.ui.view.inline_view", nil, {
+			local inline_view = adapter.inline_view(nil, "show_single_file", {
 				notify = false,
-				functions = "show_single_file",
 			})
 			if inline_view then
 				inline_view.show_single_file(tabpage, abs_path, {
@@ -133,9 +133,8 @@ local function show_added_file_as_editable(tabpage, explorer, file_data)
 			return
 		end
 
-		local side_by_side = helpers.require_module("codediff.ui.view.side_by_side", nil, {
+		local side_by_side = adapter.side_by_side(nil, "show_untracked_file", {
 			notify = false,
-			functions = "show_untracked_file",
 		})
 		if side_by_side then
 			side_by_side.show_untracked_file(tabpage, abs_path)
@@ -146,9 +145,8 @@ local function show_added_file_as_editable(tabpage, explorer, file_data)
 end
 
 local function refresh_added_file_after_write(explorer)
-	local refresh = helpers.require_module("codediff.ui.explorer.refresh", nil, {
+	local refresh = adapter.explorer_refresh(nil, "refresh", {
 		notify = false,
-		functions = "refresh",
 	})
 	if not refresh then
 		return
@@ -167,7 +165,7 @@ local function ensure_added_file_stays_staged(tabpage, explorer, file_data)
 		return
 	end
 
-	local lifecycle = helpers.get_loaded_module("codediff.ui.lifecycle")
+	local lifecycle = adapter.loaded_lifecycle()
 	if not lifecycle then
 		return
 	end
@@ -182,9 +180,8 @@ local function ensure_added_file_stays_staged(tabpage, explorer, file_data)
 			return
 		end
 
-		local git = helpers.require_module("codediff.core.git", nil, {
+		local git = adapter.git(nil, "stage_file", {
 			notify = false,
-			functions = "stage_file",
 		})
 		if not git then
 			return
@@ -240,7 +237,7 @@ local function set_statusline_filename(tabpage, explorer, file_data)
 		return
 	end
 
-	local lifecycle = helpers.get_loaded_module("codediff.ui.lifecycle")
+	local lifecycle = adapter.loaded_lifecycle()
 	if not lifecycle then
 		return
 	end
@@ -249,10 +246,12 @@ local function set_statusline_filename(tabpage, explorer, file_data)
 		local original_bufnr, modified_bufnr = lifecycle.get_buffers(tabpage)
 		local filename = vim.fn.fnamemodify(file_path, ":t")
 		local progress = get_statusline_file_progress(explorer)
+		local review_progress = review.get_progress(explorer)
 		local current_state = statusline_state_by_tabpage[tabpage]
 		statusline_state_by_tabpage[tabpage] = {
 			name = filename,
 			progress = progress,
+			review_progress = review_progress,
 			hunk_progress = current_state and current_state.hunk_progress or nil,
 		}
 
@@ -260,6 +259,7 @@ local function set_statusline_filename(tabpage, explorer, file_data)
 			if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
 				vim.b[bufnr].codediff_status_name = filename
 				vim.b[bufnr].codediff_status_progress = progress
+				vim.b[bufnr].codediff_review_progress = review_progress
 			end
 		end
 
@@ -329,12 +329,14 @@ end
 -- Open the explorer view for a repo status snapshot, optionally focusing a file.
 function M.open_status_explorer(repo, focus_file, opts, get_codediff_lifecycle)
 	opts = opts or {}
-	local codediff_git, view = helpers.get_codediff_modules()
-	if not codediff_git or not view then
+	local git = adapter.git(nil, "get_status", { notify = false })
+	local codediff_view = adapter.view(nil, "create", { notify = false })
+	if not git or not codediff_view then
+		helpers.notify_error("failed to load or validate codediff modules")
 		return
 	end
 
-	codediff_git.get_status(repo, function(err, status_result)
+	git.get_status(repo, function(err, status_result)
 		if err then
 			helpers.notify_error(err)
 			return
@@ -345,7 +347,7 @@ function M.open_status_explorer(repo, focus_file, opts, get_codediff_lifecycle)
 		end
 
 		vim.schedule(function()
-			view.create({
+			codediff_view.create({
 				mode = "explorer",
 				git_root = repo,
 				original_path = "",
@@ -476,6 +478,7 @@ function M.resume_last_session(get_codediff_lifecycle)
 	resume.resume(get_codediff_lifecycle, {
 		focus_diff_window = M.focus_diff_window,
 		open_status_explorer = M.open_status_explorer,
+		refresh_statusline = M.refresh_statusline,
 		select_explorer_file = M.select_explorer_file,
 		set_explorer_options = M.set_explorer_options,
 		toggle_explorer = M.toggle_explorer,
@@ -500,15 +503,28 @@ function M.ensure_explorer_window_state(get_codediff_lifecycle, tabpage)
 		return
 	end
 
+	review.install_renderer(explorer)
 	ensure_editable_added_file_override(tabpage, explorer)
 	set_statusline_filename(tabpage, explorer)
+	review.render(explorer)
 	disable_panel_scrollbind(get_explorer_winid(explorer))
+end
+
+function M.refresh_statusline(get_codediff_lifecycle, tabpage)
+	local explorer = M.get_explorer(get_codediff_lifecycle, tabpage)
+	if not explorer then
+		return
+	end
+
+	review.install_renderer(explorer)
+	set_statusline_filename(tabpage, explorer)
+	review.render(explorer)
 end
 
 function M.get_file_position(tabpage)
 	tabpage = tabpage or vim.api.nvim_get_current_tabpage()
 
-	local lifecycle = helpers.get_loaded_module("codediff.ui.lifecycle")
+	local lifecycle = adapter.loaded_lifecycle()
 	if not lifecycle then
 		return nil
 	end
@@ -530,7 +546,7 @@ end
 function M.get_hunk_progress(tabpage)
 	tabpage = tabpage or vim.api.nvim_get_current_tabpage()
 
-	local lifecycle = helpers.get_loaded_module("codediff.ui.lifecycle")
+	local lifecycle = adapter.loaded_lifecycle()
 	if not lifecycle then
 		return nil
 	end
@@ -614,9 +630,7 @@ function M.toggle_explorer(get_codediff_lifecycle, tabpage)
 		return
 	end
 
-	local explorer_ui = helpers.require_module("codediff.ui.explorer", "Failed to load codediff explorer", {
-		functions = "toggle_visibility",
-	})
+	local explorer_ui = adapter.explorer("Failed to load codediff explorer", "toggle_visibility")
 	if not explorer_ui then
 		return
 	end
@@ -721,9 +735,8 @@ function M.open_explorer_entry(get_codediff_lifecycle, tabpage, explorer)
 end
 
 function M.install_refresh_filter()
-	local refresh = helpers.require_module("codediff.ui.explorer.refresh", nil, {
+	local refresh = adapter.explorer_refresh(nil, "refresh", {
 		notify = false,
-		functions = "refresh",
 	})
 	if not refresh or refresh._user_hide_untracked_installed then
 		return

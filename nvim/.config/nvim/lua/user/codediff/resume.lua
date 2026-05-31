@@ -1,4 +1,5 @@
 local filters = require("user.codediff.filters")
+local review = require("user.codediff.review")
 
 local M = {}
 
@@ -124,6 +125,7 @@ local function capture_resume_snapshot(session, explorer, cursor)
 		file_path = file_path,
 		group = group,
 		cursor = vim.deepcopy(cursor),
+		reviewed = vim.deepcopy(explorer._user_reviewed),
 		hide_untracked = session.hide_untracked ~= false,
 		explorer_hidden = explorer.is_hidden or false,
 		original_revision = explorer.base_revision,
@@ -196,8 +198,16 @@ local function apply_snapshot(get_codediff_lifecycle, snapshot, deps, attempt)
 	end
 
 	local selection = find_status_entry(explorer.status_result, snapshot.file_path, snapshot.group)
+	explorer._user_reviewed = vim.deepcopy(snapshot.reviewed)
+	review.install_renderer(explorer)
 	if selection then
 		deps.select_explorer_file(explorer, selection)
+	else
+		review.render(explorer)
+	end
+
+	if deps.refresh_statusline then
+		deps.refresh_statusline(get_codediff_lifecycle, tabpage)
 	end
 
 	vim.defer_fn(function()
@@ -211,6 +221,13 @@ local function apply_snapshot(get_codediff_lifecycle, snapshot, deps, attempt)
 		local current_explorer = current_lifecycle.get_explorer(current_tabpage)
 		if not current_session or not current_explorer or current_session.mode ~= "explorer" then
 			return
+		end
+
+		current_explorer._user_reviewed = vim.deepcopy(snapshot.reviewed)
+		review.install_renderer(current_explorer)
+		review.render(current_explorer)
+		if deps.refresh_statusline then
+			deps.refresh_statusline(get_codediff_lifecycle, current_tabpage)
 		end
 
 		if snapshot.explorer_hidden and not current_explorer.is_hidden then

@@ -1,6 +1,7 @@
 local M = {}
 
-local helpers = require("user.codediff.helpers")
+local adapter = require("user.codediff.adapter")
+local visual = require("user.codediff.visual")
 
 local custom_codediff_keymaps = {
 	"<CR>",
@@ -15,6 +16,10 @@ local custom_codediff_keymaps = {
 	"<leader>gz",
 	"<leader>gu",
 	"<leader>gx",
+	"<leader>gR",
+	"r",
+	"]r",
+	"[r",
 	"s",
 	"u",
 	"x",
@@ -47,6 +52,7 @@ local function clear_buffer_keymaps(bufnr)
 
 	for _, lhs in ipairs(custom_codediff_keymaps) do
 		pcall(vim.keymap.del, "n", lhs, { buffer = bufnr })
+		pcall(vim.keymap.del, "x", lhs, { buffer = bufnr })
 	end
 end
 
@@ -128,6 +134,60 @@ local function wrap_tab_action(tabpage, get_codediff_lifecycle, action)
 	end
 end
 
+local function refresh_review_statusline(tabpage, get_codediff_lifecycle, deps)
+	if deps.view.refresh_statusline then
+		deps.view.refresh_statusline(get_codediff_lifecycle, tabpage)
+	end
+end
+
+local function jump_unreviewed(tabpage, get_codediff_lifecycle, deps, direction)
+	local lifecycle = get_codediff_lifecycle()
+	local explorer = lifecycle and lifecycle.get_explorer(tabpage) or nil
+	if not explorer then
+		return
+	end
+
+	local file_data = deps.review.find_unreviewed(explorer, direction)
+	if not file_data then
+		return
+	end
+
+	deps.view.select_explorer_file(explorer, file_data)
+	refresh_review_statusline(tabpage, get_codediff_lifecycle, deps)
+	vim.schedule(function()
+		deps.view.focus_diff_window(get_codediff_lifecycle, tabpage)
+	end)
+end
+
+local function toggle_reviewed(tabpage, get_codediff_lifecycle, deps)
+	local lifecycle = get_codediff_lifecycle()
+	local explorer = lifecycle and lifecycle.get_explorer(tabpage) or nil
+	if not explorer then
+		return false
+	end
+
+	local reviewed = deps.review.toggle_current(explorer)
+	refresh_review_statusline(tabpage, get_codediff_lifecycle, deps)
+	return reviewed
+end
+
+local function review_and_advance(tabpage, get_codediff_lifecycle, deps)
+	if toggle_reviewed(tabpage, get_codediff_lifecycle, deps) then
+		jump_unreviewed(tabpage, get_codediff_lifecycle, deps, 1)
+	end
+end
+
+local function clear_reviewed(tabpage, get_codediff_lifecycle, deps)
+	local lifecycle = get_codediff_lifecycle()
+	local explorer = lifecycle and lifecycle.get_explorer(tabpage) or nil
+	if not explorer then
+		return
+	end
+
+	deps.review.clear(explorer)
+	refresh_review_statusline(tabpage, get_codediff_lifecycle, deps)
+end
+
 function M.install_buffer_update_hook(get_codediff_lifecycle, deps)
 	local lifecycle = get_codediff_lifecycle()
 	if not lifecycle or lifecycle._user_keymap_reconcile_installed then
@@ -163,6 +223,22 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 		remember_buffer(tabpage, session, bufnr)
 
 		vim.keymap.set("n", lhs, wrap_tab_action(tabpage, get_codediff_lifecycle, rhs), {
+			buffer = bufnr,
+			noremap = true,
+			silent = true,
+			nowait = true,
+			desc = desc,
+		})
+	end
+
+	local function set_visual_buffer_keymap(bufnr, lhs, rhs, desc)
+		if not (bufnr and vim.api.nvim_buf_is_valid(bufnr)) then
+			return
+		end
+
+		remember_buffer(tabpage, session, bufnr)
+
+		vim.keymap.set("x", lhs, wrap_tab_action(tabpage, get_codediff_lifecycle, rhs), {
 			buffer = bufnr,
 			noremap = true,
 			silent = true,
@@ -219,9 +295,8 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 
 	local original_bufnr, modified_bufnr = lifecycle.get_buffers(tabpage)
 	if session.mode == "explorer" then
-		local navigation = helpers.require_module("codediff.ui.view.navigation", nil, {
+		local navigation = adapter.navigation(nil, { "next_hunk", "prev_hunk" }, {
 			notify = false,
-			functions = { "next_hunk", "prev_hunk" },
 		})
 
 		for _, bufnr in ipairs({ original_bufnr, modified_bufnr }) do
@@ -250,6 +325,22 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 			set_buffer_keymap(bufnr, "<leader>gx", function()
 				deps.actions.restore_entry(get_codediff_lifecycle, tabpage)
 			end, "Discard current entry")
+
+			set_buffer_keymap(bufnr, "r", function()
+				review_and_advance(tabpage, get_codediff_lifecycle, deps)
+			end, "Review current CodeDiff entry and advance")
+
+			set_buffer_keymap(bufnr, "<leader>gR", function()
+				clear_reviewed(tabpage, get_codediff_lifecycle, deps)
+			end, "Clear CodeDiff reviewed marks")
+
+			set_buffer_keymap(bufnr, "]r", function()
+				jump_unreviewed(tabpage, get_codediff_lifecycle, deps, 1)
+			end, "Next unreviewed CodeDiff file")
+
+			set_buffer_keymap(bufnr, "[r", function()
+				jump_unreviewed(tabpage, get_codediff_lifecycle, deps, -1)
+			end, "Previous unreviewed CodeDiff file")
 		end
 	end
 
@@ -258,9 +349,8 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 		explorer.hide_untracked = session.hide_untracked or false
 	end
 	if explorer and explorer.bufnr and vim.api.nvim_buf_is_valid(explorer.bufnr) then
-		local navigation = helpers.require_module("codediff.ui.view.navigation", nil, {
+		local navigation = adapter.navigation(nil, { "next_file", "prev_file" }, {
 			notify = false,
-			functions = { "next_file", "prev_file" },
 		})
 
 		set_buffer_keymap(explorer.bufnr, "<CR>", function()
@@ -289,6 +379,22 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 			deps.actions.restore_entry(get_codediff_lifecycle, tabpage)
 		end, "Discard current entry")
 
+		set_buffer_keymap(explorer.bufnr, "r", function()
+			toggle_reviewed(tabpage, get_codediff_lifecycle, deps)
+		end, "Toggle CodeDiff reviewed")
+
+		set_buffer_keymap(explorer.bufnr, "<leader>gR", function()
+			clear_reviewed(tabpage, get_codediff_lifecycle, deps)
+		end, "Clear CodeDiff reviewed marks")
+
+		set_buffer_keymap(explorer.bufnr, "]r", function()
+			jump_unreviewed(tabpage, get_codediff_lifecycle, deps, 1)
+		end, "Next unreviewed CodeDiff file")
+
+		set_buffer_keymap(explorer.bufnr, "[r", function()
+			jump_unreviewed(tabpage, get_codediff_lifecycle, deps, -1)
+		end, "Previous unreviewed CodeDiff file")
+
 		set_buffer_keymap(explorer.bufnr, "s", function()
 			deps.actions.stage_entry(get_codediff_lifecycle, tabpage)
 		end, "Stage current entry")
@@ -300,6 +406,26 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 		set_buffer_keymap(explorer.bufnr, "x", function()
 			deps.actions.restore_entry(get_codediff_lifecycle, tabpage)
 		end, "Discard current entry")
+
+		set_visual_buffer_keymap(explorer.bufnr, "r", function()
+			visual.toggle_reviewed(get_codediff_lifecycle, tabpage, deps)
+		end, "Toggle selected CodeDiff reviewed")
+
+		set_visual_buffer_keymap(explorer.bufnr, "s", function()
+			visual.stage(get_codediff_lifecycle, tabpage, deps)
+		end, "Stage selected CodeDiff entries")
+
+		set_visual_buffer_keymap(explorer.bufnr, "u", function()
+			visual.unstage(get_codediff_lifecycle, tabpage, deps)
+		end, "Unstage selected CodeDiff entries")
+
+		set_visual_buffer_keymap(explorer.bufnr, "<leader>gz", function()
+			visual.stage(get_codediff_lifecycle, tabpage, deps)
+		end, "Stage selected CodeDiff entries")
+
+		set_visual_buffer_keymap(explorer.bufnr, "<leader>gu", function()
+			visual.unstage(get_codediff_lifecycle, tabpage, deps)
+		end, "Unstage selected CodeDiff entries")
 	end
 
 	prune_inactive_buffers(tabpage, get_codediff_lifecycle)
