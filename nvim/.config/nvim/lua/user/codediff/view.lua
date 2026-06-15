@@ -3,6 +3,7 @@ local M = {}
 local adapter = require("user.codediff.adapter")
 local filters = require("user.codediff.filters")
 local helpers = require("user.codediff.helpers")
+local lsp = require("user.codediff.lsp")
 local review = require("user.codediff.review")
 local resume = require("user.codediff.resume")
 
@@ -297,7 +298,9 @@ local function ensure_editable_added_file_override(tabpage, explorer)
 	local original_on_file_select = explorer.on_file_select
 	explorer.on_file_select = function(file_data, opts)
 		set_statusline_filename(tabpage, explorer, file_data)
+		lsp.prepare_selection(explorer, file_data)
 		original_on_file_select(file_data, opts)
+		lsp.apply_to_session(adapter.loaded_lifecycle(), tabpage)
 
 		show_added_file_as_editable(tabpage, explorer, file_data)
 		ensure_added_file_stays_staged(tabpage, explorer, file_data)
@@ -505,6 +508,7 @@ function M.ensure_explorer_window_state(get_codediff_lifecycle, tabpage)
 
 	review.install_renderer(explorer)
 	ensure_editable_added_file_override(tabpage, explorer)
+	lsp.apply_to_session(adapter.loaded_lifecycle(), tabpage)
 	set_statusline_filename(tabpage, explorer)
 	review.render(explorer)
 	disable_panel_scrollbind(get_explorer_winid(explorer))
@@ -517,6 +521,7 @@ function M.refresh_statusline(get_codediff_lifecycle, tabpage)
 	end
 
 	review.install_renderer(explorer)
+	lsp.apply_to_session(adapter.loaded_lifecycle(), tabpage)
 	set_statusline_filename(tabpage, explorer)
 	review.render(explorer)
 end

@@ -170,6 +170,7 @@ end
 
 function M.setup()
 	local modules = get_codediff_modules()
+	local lsp = require("user.codediff.lsp")
 	local keymap_deps = {
 		actions = modules.actions,
 		review = modules.review,
@@ -182,6 +183,7 @@ function M.setup()
 	modules.keymaps.install_buffer_update_hook(get_codediff_lifecycle, keymap_deps)
 
 	local codediff_group = vim.api.nvim_create_augroup("user_codediff", { clear = true })
+	lsp.install_autocmds(codediff_group)
 
 	vim.api.nvim_create_autocmd("User", {
 		group = codediff_group,

@@ -116,6 +116,22 @@ local function create_pr_diff_repo_with_dirty_worktree()
 	return repo
 end
 
+local function create_large_schema_repo()
+	repo = h.create_temp_git_repo()
+	local lines = {
+		"{",
+		string.format("%q: %q", "schema", string.rep("x", 520 * 1024)),
+		"}",
+	}
+
+	repo.write_file("schema.json", lines)
+	repo.git_ok({ "add", "." })
+	repo.git_ok({ "commit", "-m", "initial" })
+	table.insert(lines, 2, '"changed": true,')
+	repo.write_file("schema.json", lines)
+	return repo
+end
+
 local function with_branch_and_mode(branch, mode, callback)
 	local helpers = require("user.codediff.helpers")
 	local original_with_branch = helpers.with_branch
@@ -191,6 +207,22 @@ describe("local CodeDiff workflow", function()
 		assert.is_not_nil(h.find_tree_entry(explorer, "alpha.lua", "staged"))
 		assert.is_nil(h.find_tree_entry(explorer, "alpha.lua", "unstaged"))
 		assert.is_not_nil(h.find_tree_entry(explorer, "beta.lua", "unstaged"))
+	end)
+
+	it("disables LSP for large diff buffers", function()
+		repo = create_large_schema_repo()
+		local tabpage = h.open_status_explorer(repo, "schema.json", { hide_untracked = true })
+		local lifecycle = h.get_codediff_lifecycle()
+
+		h.wait_for(function()
+			local session = lifecycle.get_session(tabpage)
+			return session and vim.b[session.modified_bufnr].codediff_lsp_disabled == true
+		end, 10000, "Large CodeDiff buffer did not disable LSP")
+
+		local session = lifecycle.get_session(tabpage)
+		assert.is_true(vim.b[session.modified_bufnr].codediff_lsp_disabled)
+		assert.are.equal("", vim.bo[session.modified_bufnr].filetype)
+		assert.are.equal(0, #vim.lsp.get_clients({ bufnr = session.modified_bufnr }))
 	end)
 
 	it("unstages from hidden diff buffers and reopens with refreshed explorer state", function()
