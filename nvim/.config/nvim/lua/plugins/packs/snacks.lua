@@ -7,9 +7,9 @@ return {
 		{
 			"<leader>fs",
 			function()
-				Snacks.picker.grep()
+				Snacks.picker.lsp_workspace_symbols()
 			end,
-			desc = "Grep",
+			desc = "LSP Workspace Symbols",
 		},
 		{ "<leader>fw", false },
 		{
