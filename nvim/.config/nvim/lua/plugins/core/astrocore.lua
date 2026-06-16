@@ -31,6 +31,21 @@ local function yank_path(path, title)
 	Snacks.notifier.notify("Copied: " .. path, "info", { title = title })
 end
 
+local function open_current_folder_in_finder()
+	local path = get_current_path()
+	if path == nil or path == "" then
+		Snacks.notifier.notify("No file path to open", "warn", { title = "Finder" })
+		return
+	end
+
+	local absolute_path = vim.fn.fnamemodify(path, ":p")
+	local dir = vim.fn.isdirectory(absolute_path) == 1 and absolute_path or vim.fn.fnamemodify(absolute_path, ":h")
+	local job_id = vim.fn.jobstart({ "open", dir }, { detach = true })
+	if job_id <= 0 then
+		Snacks.notifier.notify("Failed to open Finder", "error", { title = "Finder" })
+	end
+end
+
 ---@type LazySpec
 return {
 	"AstroNvim/astrocore",
@@ -79,6 +94,10 @@ return {
 			-- first key is the mode
 			n = {
 				["<Leader>ff"] = false,
+				["<Leader>fo"] = {
+					open_current_folder_in_finder,
+					desc = "Open folder in Finder",
+				},
 				["<Leader>fs"] = false,
 				["<Leader>fw"] = false,
 				["<Esc>"] = {
