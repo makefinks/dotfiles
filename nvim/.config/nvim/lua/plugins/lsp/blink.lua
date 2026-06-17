@@ -2,6 +2,9 @@ return {
 	"saghen/blink.cmp",
 	event = "VeryLazy",
 	opts = {
+		enabled = function()
+			return vim.bo.filetype ~= "dap-repl"
+		end,
 		signature = {
 			enabled = true,
 			trigger = {

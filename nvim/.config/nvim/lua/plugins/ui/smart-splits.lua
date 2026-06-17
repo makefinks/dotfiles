@@ -11,6 +11,7 @@ return {
 			function()
 				require("smart-splits").resize_up()
 			end,
+			mode = { "n", "i", "t" },
 			desc = "Resize split up",
 		},
 		{
@@ -18,6 +19,7 @@ return {
 			function()
 				require("smart-splits").resize_down()
 			end,
+			mode = { "n", "i", "t" },
 			desc = "Resize split down",
 		},
 		{
@@ -25,6 +27,7 @@ return {
 			function()
 				require("smart-splits").resize_left()
 			end,
+			mode = { "n", "i", "t" },
 			desc = "Resize split left",
 		},
 		{
@@ -32,6 +35,39 @@ return {
 			function()
 				require("smart-splits").resize_right()
 			end,
+			mode = { "n", "i", "t" },
+			desc = "Resize split right",
+		},
+		{
+			"<M-S-Up>",
+			function()
+				require("smart-splits").resize_up()
+			end,
+			mode = { "n", "i", "t" },
+			desc = "Resize split up",
+		},
+		{
+			"<M-S-Down>",
+			function()
+				require("smart-splits").resize_down()
+			end,
+			mode = { "n", "i", "t" },
+			desc = "Resize split down",
+		},
+		{
+			"<M-S-Left>",
+			function()
+				require("smart-splits").resize_left()
+			end,
+			mode = { "n", "i", "t" },
+			desc = "Resize split left",
+		},
+		{
+			"<M-S-Right>",
+			function()
+				require("smart-splits").resize_right()
+			end,
+			mode = { "n", "i", "t" },
 			desc = "Resize split right",
 		},
 	},

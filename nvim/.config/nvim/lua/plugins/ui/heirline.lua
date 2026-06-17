@@ -83,6 +83,28 @@ return {
 					-- define the section separator
 					surround = { separator = "left", condition = false },
 				}),
+				status.component.builder({
+					{
+						provider = function()
+							if vim.g.dap_status == "paused" then
+								return "  DBG PAUSE "
+							end
+
+							return " " .. (vim.g.dap_status_frame or "⠋") .. " DBG RUN "
+						end,
+					},
+					condition = function()
+						return vim.g.dap_status ~= nil and not_codediff()
+					end,
+					hl = function()
+						if vim.g.dap_status == "paused" then
+							return { fg = "#cba6f7", bold = true }
+						end
+
+						return { fg = "#FFD166", bold = true }
+					end,
+					surround = { separator = "none", color = "bg" },
+				}),
 				-- add a component for the current git branch if it exists and use no separator for the sections
 				status.component.git_branch({
 					git_branch = { padding = { left = 1 } },

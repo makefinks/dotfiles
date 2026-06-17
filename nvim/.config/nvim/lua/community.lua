@@ -7,4 +7,5 @@ return {
 	{ "AstroNvim/astrocommunity", lazy = true },
 	{ import = "astrocommunity.pack.lua", lazy = true },
 	{ import = "astrocommunity.recipes.neovide", lazy = true },
+	{ import = "astrocommunity.debugging.nvim-dap-view", lazy = true },
 }
