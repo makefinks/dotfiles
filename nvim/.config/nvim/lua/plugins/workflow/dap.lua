@@ -288,6 +288,35 @@ return {
 				type = "executable",
 				command = vim.fn.exepath("debugpy-adapter"),
 			}
+			-- Alias `debugpy` (VS Code's type id) to the python adapter, so shared
+			-- launch.json files using `"type": "debugpy"` work without edits.
+			dap.adapters.debugpy = vim.deepcopy(dap.adapters.python)
+
+			-- Inject a `python` interpreter into python/debugpy launch configs that
+			-- don't specify one. Prefers the shell's activated venv ($VIRTUAL_ENV),
+			-- then falls back to `python` from $PATH. Lets shared/locked launch.json
+			-- files work across projects without per-project edits.
+			dap.listeners.on_config["user-python-venv"] = function(config)
+				if config.type ~= "python" and config.type ~= "debugpy" then
+					return config
+				end
+				if config.python ~= nil or config.pythonPath ~= nil then
+					return config
+				end
+
+				local new_config = vim.deepcopy(config)
+				local venv = vim.env.VIRTUAL_ENV
+				if venv and vim.fn.executable(venv .. "/bin/python") == 1 then
+					new_config.python = venv .. "/bin/python"
+				else
+					local py = vim.fn.exepath("python")
+					if py ~= "" then
+						new_config.python = py
+					end
+				end
+				return new_config
+			end
+
 			dap.configurations.python = {
 				{
 					type = "python",
