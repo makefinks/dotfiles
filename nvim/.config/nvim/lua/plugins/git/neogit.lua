@@ -10,6 +10,7 @@ return {
 		{
 			"<leader>gn",
 			function()
+				require("user.codediff").close_all_views()
 				require("neogit").open({ kind = "tab" })
 			end,
 			desc = "[G]it [N]eogit status",

@@ -17,6 +17,7 @@ local function get_codediff_modules()
 end
 
 function M.open_pr_diff_against_branch()
+	M.close_all_views()
 	local modules = get_codediff_modules()
 
 	local function open_filtered_command(command)
@@ -102,6 +103,7 @@ get_codediff_lifecycle = function()
 end
 
 function M.current_file_diff()
+	M.close_all_views()
 	local modules = get_codediff_modules()
 	local context = modules.helpers.get_current_repo_file_info()
 	if not context then
@@ -117,6 +119,7 @@ function M.current_file_diff()
 end
 
 function M.project_diff(opts)
+	M.close_all_views()
 	opts = opts or {}
 	local modules = get_codediff_modules()
 	local repo = modules.helpers.get_cwd_repo()
@@ -136,11 +139,17 @@ function M.close_view()
 	get_codediff_modules().view.close_view(get_codediff_lifecycle)
 end
 
+function M.close_all_views()
+	get_codediff_modules().view.close_all_views(get_codediff_lifecycle)
+end
+
 function M.resume_last_session()
+	M.close_all_views()
 	get_codediff_modules().view.resume_last_session(get_codediff_lifecycle)
 end
 
 function M.file_in_branch()
+	M.close_all_views()
 	local modules = get_codediff_modules()
 	local context = modules.helpers.get_current_repo_file_info()
 	if not context then

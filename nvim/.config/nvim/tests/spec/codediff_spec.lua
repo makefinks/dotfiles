@@ -1002,4 +1002,56 @@ describe("local CodeDiff workflow", function()
 			return vim.trim(repo.git_ok({ "status", "--short", "new.lua" })) == "A  new.lua"
 		end, 10000, "Saved staged added file was not re-staged")
 	end)
+
+	it("close_all_views tears down every active codediff session", function()
+		local view = require("user.codediff.view")
+		local lifecycle = h.get_codediff_lifecycle()
+
+		repo = create_two_modified_files_repo()
+		local first_tabpage = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+
+		vim.cmd("tabnew")
+		view.open_status_explorer(repo.dir, "beta.lua", { hide_untracked = true }, h.get_codediff_lifecycle)
+		local second_tabpage
+		h.wait_for(function()
+			for _, tp in ipairs(vim.api.nvim_list_tabpages()) do
+				if tp ~= first_tabpage then
+					local session = lifecycle.get_session(tp)
+					if session and session.mode == "explorer" then
+						second_tabpage = tp
+						return true
+					end
+				end
+			end
+			return false
+		end, 15000, "Second CodeDiff explorer did not open")
+
+		assert.is_not_nil(lifecycle.get_session(first_tabpage))
+		assert.is_not_nil(lifecycle.get_session(second_tabpage))
+
+		view.close_all_views(h.get_codediff_lifecycle)
+
+		h.wait_for(function()
+			return lifecycle.get_session(first_tabpage) == nil and lifecycle.get_session(second_tabpage) == nil
+		end, 10000, "close_all_views did not tear down both sessions")
+	end)
+
+	it("closes the prior codediff session when opening codediff again", function()
+		local lifecycle = h.get_codediff_lifecycle()
+
+		repo = create_two_modified_files_repo()
+		vim.fn.chdir(repo.dir)
+		local first_tabpage = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+		assert.is_not_nil(lifecycle.get_session(first_tabpage))
+
+		vim.cmd("tabnew " .. vim.fn.fnameescape(repo.path("beta.lua")))
+
+		require("user.codediff").project_diff()
+
+		h.wait_for(function()
+			return lifecycle.get_session(first_tabpage) == nil
+		end, 10000, "Opening codediff again did not close the prior session")
+
+		h.wait_for_explorer_session({}, 15000, "CodeDiff did not reopen after closing the prior session")
+	end)
 end)

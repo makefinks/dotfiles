@@ -409,6 +409,43 @@ function M.close_view(get_codediff_lifecycle)
 	vim.cmd("tabclose")
 end
 
+-- Close every active codediff tab so a fresh opener never layers on top of an existing session.
+function M.close_all_views(get_codediff_lifecycle)
+	local lifecycle = get_codediff_lifecycle()
+	if not lifecycle then
+		return
+	end
+
+	local active_tabpages = {}
+	for _, tabpage in ipairs(vim.api.nvim_list_tabpages()) do
+		if lifecycle.get_session(tabpage) then
+			table.insert(active_tabpages, tabpage)
+		end
+	end
+
+	if #active_tabpages == 0 then
+		return
+	end
+
+	for _, tabpage in ipairs(active_tabpages) do
+		if not lifecycle.confirm_close_with_unsaved(tabpage) then
+			return
+		end
+		M.save_resume_snapshot(get_codediff_lifecycle, tabpage)
+	end
+
+	-- Keep at least one tab alive when every open tab is a codediff session.
+	if #active_tabpages == #vim.api.nvim_list_tabpages() then
+		vim.cmd("tabnew")
+	end
+
+	for _, tabpage in ipairs(active_tabpages) do
+		if vim.api.nvim_tabpage_is_valid(tabpage) then
+			pcall(vim.cmd, vim.api.nvim_tabpage_get_number(tabpage) .. "tabclose")
+		end
+	end
+end
+
 function M.open_file_from_diff(get_codediff_lifecycle, tabpage)
 	local lifecycle = get_codediff_lifecycle()
 	if not lifecycle then
