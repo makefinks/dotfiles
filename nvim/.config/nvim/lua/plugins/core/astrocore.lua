@@ -93,6 +93,7 @@ return {
 		mappings = {
 			-- first key is the mode
 			n = {
+				["<Leader>c"] = false,
 				["<Leader>ff"] = false,
 				["<Leader>fo"] = {
 					open_current_folder_in_finder,
