@@ -5,6 +5,10 @@ return {
 		enabled = function()
 			return vim.bo.filetype ~= "dap-repl"
 		end,
+		keymap = {
+			preset = "default",
+			["<C-l>"] = { "show", "show_documentation", "hide_documentation" }
+		},
 		signature = {
 			enabled = true,
 			trigger = {
