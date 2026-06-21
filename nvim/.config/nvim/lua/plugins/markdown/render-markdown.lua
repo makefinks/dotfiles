@@ -11,7 +11,7 @@ return {
 	opts = {
 		enabled = false,
 		completions = {
-			lsp = { enabled = true },
+			lsp = { enabled = false },
 		},
 	},
 	keys = {

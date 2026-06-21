@@ -1,6 +1,8 @@
 local h = require("tests.helpers.codediff")
 
 local original_cwd
+local original_fn_input
+local original_notify
 local repo
 local echo_capture
 
@@ -199,6 +201,16 @@ describe("local CodeDiff workflow", function()
 	end)
 
 	after_each(function()
+		if original_notify then
+			vim.notify = original_notify
+			original_notify = nil
+		end
+
+		if original_fn_input then
+			vim.fn.input = original_fn_input
+			original_fn_input = nil
+		end
+
 		if echo_capture then
 			echo_capture.restore()
 			echo_capture = nil
@@ -341,6 +353,78 @@ describe("local CodeDiff workflow", function()
 				and not h.status_has_path(status_result, "staged", "alpha.lua")
 				and not h.status_has_path(status_result, "staged", "beta.lua")
 		end, 15000, "Visual CodeDiff unstage did not unstage selected files")
+	end)
+
+	it("commits staged files from the CodeDiff mapping without staging unstaged files", function()
+		repo = create_staged_and_unstaged_repo()
+		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+
+		h.wait_for(function()
+			return h.status_has_path(explorer.status_result, "staged", "alpha.lua")
+				and h.status_has_path(explorer.status_result, "unstaged", "beta.lua")
+		end, 10000, "CodeDiff did not open staged and unstaged files")
+
+		original_fn_input = vim.fn.input
+		vim.fn.input = function()
+			return "commit staged alpha"
+		end
+
+		local modified_bufnr
+		h.wait_for(function()
+			modified_bufnr = h.focus_modified_window(tabpage)
+			return h.buffer_has_keymap(modified_bufnr, "<leader>gc")
+		end, 10000, "CodeDiff commit mapping was not ready")
+
+		vim.api.nvim_buf_call(modified_bufnr, function()
+			vim.fn.maparg("<leader>gc", "n", false, true).callback()
+		end)
+
+		h.wait_for(function()
+			return vim.trim(repo.git_ok({ "log", "-1", "--pretty=%s" })) == "commit staged alpha"
+		end, 15000, "CodeDiff commit mapping did not create a commit")
+
+		h.wait_for(function()
+			local status_result = explorer.status_result
+			return not h.status_has_path(status_result, "staged", "alpha.lua")
+				and not h.status_has_path(status_result, "unstaged", "alpha.lua")
+				and h.status_has_path(status_result, "unstaged", "beta.lua")
+		end, 15000, "CodeDiff did not refresh after committing staged files")
+
+		assert.matches("^ M beta%.lua", repo.git_ok({ "status", "--short" }))
+	end)
+
+	it("does not prompt for a commit message when nothing is staged", function()
+		local actions = require("user.codediff.actions")
+
+		repo = create_two_modified_files_repo()
+		local tabpage = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+		local head_before = vim.trim(repo.git_ok({ "rev-parse", "HEAD" }))
+		local prompted = false
+		local warned = false
+
+		original_fn_input = vim.fn.input
+		vim.fn.input = function()
+			prompted = true
+			return "should not commit"
+		end
+
+		original_notify = vim.notify
+		vim.notify = function(message, level, opts)
+			if message == "No staged changes to commit" then
+				warned = true
+			end
+
+			return original_notify(message, level, opts)
+		end
+
+		actions.commit_staged(h.get_codediff_lifecycle, tabpage)
+
+		h.wait_for(function()
+			return warned
+		end, 10000, "CodeDiff did not warn about an empty index")
+
+		assert.is_false(prompted)
+		assert.are.equal(head_before, vim.trim(repo.git_ok({ "rev-parse", "HEAD" })))
 	end)
 
 	it("rebinds diff-buffer mappings after staging advances to the next file", function()

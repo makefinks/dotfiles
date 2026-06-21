@@ -13,6 +13,7 @@ local custom_codediff_keymaps = {
 	"q",
 	"ff",
 	"<leader>e",
+	"<leader>gc",
 	"<leader>gz",
 	"<leader>gu",
 	"<leader>gx",
@@ -302,6 +303,16 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 			deps.view.toggle_result_zoom(get_codediff_lifecycle, tabpage)
 		end),
 		{ desc = "Toggle merge result zoom" }
+	)
+
+	lifecycle.set_tab_keymap(
+		tabpage,
+		"n",
+		"<leader>gc",
+		wrap_tab_action(tabpage, get_codediff_lifecycle, function()
+			deps.actions.commit_staged(get_codediff_lifecycle, tabpage)
+		end),
+		{ desc = "Commit staged changes" }
 	)
 
 	local original_bufnr, modified_bufnr = lifecycle.get_buffers(tabpage)

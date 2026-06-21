@@ -320,6 +320,57 @@ local function refresh_after_group_action(explorer, next_file)
 	refresh_visible_explorer(explorer, next_file)
 end
 
+local function refresh_after_repo_action(explorer)
+	if not explorer then
+		return
+	end
+
+	if explorer.is_hidden then
+		refresh_hidden_explorer(explorer)
+		return
+	end
+
+	refresh_explorer(explorer)
+end
+
+local function run_git(git_root, args, callback)
+	if vim.system then
+		vim.system(vim.list_extend({ "git" }, args), { cwd = git_root, text = true }, function(result)
+			callback(result.code, result.stdout or "", result.stderr or "")
+		end)
+		return
+	end
+
+	local argv = { "git", "-C", git_root }
+	vim.list_extend(argv, args)
+	local output = vim.fn.system(argv)
+	callback(vim.v.shell_error, output, output)
+end
+
+local function get_repo_context(get_codediff_lifecycle, tabpage, action_name)
+	local lifecycle = get_codediff_lifecycle()
+	if not lifecycle then
+		return nil
+	end
+
+	local session = lifecycle.get_session(tabpage)
+	local explorer = lifecycle.get_explorer(tabpage)
+	if not session or session.mode ~= "explorer" then
+		vim.notify(action_name .. " only available in codediff explorer mode", vim.log.levels.WARN)
+		return nil
+	end
+
+	if not explorer or not explorer.git_root then
+		vim.notify(action_name .. " only available in git mode", vim.log.levels.WARN)
+		return nil
+	end
+
+	return {
+		explorer = explorer,
+		git_root = explorer.git_root,
+	}
+end
+
 -- Collect the explorer/file context needed for stage and unstage actions.
 local function get_stage_context(get_codediff_lifecycle, tabpage)
 	local lifecycle = get_codediff_lifecycle()
@@ -637,6 +688,52 @@ function M.toggle_stage(get_codediff_lifecycle, tabpage)
 	end
 
 	M.stage_entry(get_codediff_lifecycle, tabpage)
+end
+
+function M.commit_staged(get_codediff_lifecycle, tabpage)
+	local context = get_repo_context(get_codediff_lifecycle, tabpage, "Commit")
+	if not context then
+		return
+	end
+
+	run_git(context.git_root, { "diff", "--cached", "--quiet", "--exit-code" }, function(diff_code, _, diff_err)
+		if diff_code == 0 then
+			vim.schedule(function()
+				vim.notify("No staged changes to commit", vim.log.levels.WARN)
+			end)
+			return
+		end
+
+		if diff_code ~= 1 then
+			vim.schedule(function()
+				vim.notify("Failed to check staged changes: " .. vim.trim(diff_err), vim.log.levels.ERROR)
+			end)
+			return
+		end
+
+		vim.schedule(function()
+			vim.fn.inputsave()
+			local message = vim.trim(vim.fn.input("Commit message: ") or "")
+			vim.fn.inputrestore()
+			vim.cmd("echo ''")
+			if message == "" then
+				return
+			end
+
+			run_git(context.git_root, { "commit", "-m", message }, function(commit_code, commit_out, commit_err)
+				vim.schedule(function()
+					if commit_code ~= 0 then
+						vim.notify("Failed to commit staged changes: " .. vim.trim(commit_err), vim.log.levels.ERROR)
+						return
+					end
+
+					local summary = vim.split(vim.trim(commit_out), "\n", { plain = true })[1]
+					vim.notify(summary ~= "" and summary or "Committed staged changes", vim.log.levels.INFO)
+					refresh_after_repo_action(context.explorer)
+				end)
+			end)
+		end)
+	end)
 end
 
 -- Discard the current file changes through the explorer's restore action.
