@@ -116,6 +116,42 @@ local function create_pr_diff_repo_with_dirty_worktree()
 	return repo
 end
 
+local function create_merge_conflict_repo()
+	repo = h.create_temp_git_repo()
+	repo.write_file("app.ts", { "export const value = 'base'" })
+	repo.git_ok({ "add", "." })
+	repo.git_ok({ "commit", "-m", "base" })
+	repo.git_ok({ "checkout", "-b", "feature" })
+	repo.write_file("app.ts", { "export const value = 'incoming'" })
+	repo.git_ok({ "add", "." })
+	repo.git_ok({ "commit", "-m", "incoming" })
+	repo.git_ok({ "checkout", "main" })
+	repo.write_file("app.ts", { "export const value = 'current'" })
+	repo.git_ok({ "add", "." })
+	repo.git_ok({ "commit", "-m", "current" })
+	repo.git({ "merge", "feature" })
+	return repo
+end
+
+local function open_conflict_file()
+	repo = create_merge_conflict_repo()
+	local tabpage, _, explorer = h.open_status_explorer(repo, "app.ts", { hide_untracked = true })
+	local lifecycle = h.get_codediff_lifecycle()
+
+	h.wait_for(function()
+		local session = lifecycle.get_session(tabpage)
+		return explorer.current_file_path == "app.ts"
+			and explorer.current_file_group == "conflicts"
+			and session
+			and session.result_bufnr
+			and vim.api.nvim_buf_is_valid(session.result_bufnr)
+			and session.result_win
+			and vim.api.nvim_win_is_valid(session.result_win)
+	end, 15000, "CodeDiff did not open the conflict file")
+
+	return tabpage, lifecycle.get_session(tabpage), explorer
+end
+
 local function create_large_schema_repo()
 	repo = h.create_temp_git_repo()
 	local lines = {
@@ -343,6 +379,34 @@ describe("local CodeDiff workflow", function()
 			assert.is_false(h.buffer_has_keymap(first_modified_bufnr, "<leader>gz"))
 			assert.is_false(h.buffer_has_keymap(first_modified_bufnr, "ff"))
 		end
+	end)
+
+	it("does not stage unresolved merge conflicts from diff buffers", function()
+		local actions = require("user.codediff.actions")
+
+		local tabpage, session = open_conflict_file()
+		vim.api.nvim_set_current_win(session.modified_win)
+
+		actions.stage_entry(h.get_codediff_lifecycle, tabpage)
+
+		local status = repo.git_ok({ "status", "--short" })
+		assert.matches("UU app%.ts", status)
+		assert.are.equal(session.result_win, vim.api.nvim_get_current_win())
+	end)
+
+	it("stages the saved merge result after conflicts are resolved", function()
+		local actions = require("user.codediff.actions")
+
+		local tabpage, session = open_conflict_file()
+		vim.api.nvim_buf_set_lines(session.result_bufnr, 0, -1, false, { "export const value = 'merged'" })
+		vim.api.nvim_set_current_win(session.result_win)
+
+		actions.stage_entry(h.get_codediff_lifecycle, tabpage)
+
+		h.wait_for(function()
+			local status = repo.git_ok({ "status", "--short" })
+			return status:match("M  app%.ts") and not status:match("UU app%.ts")
+		end, 10000, "Resolved merge result was not staged")
 	end)
 
 	it("marks files reviewed and advances to the next unreviewed file from diff buffers", function()

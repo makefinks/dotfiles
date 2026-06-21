@@ -88,6 +88,52 @@ local function get_next_file_in_group(explorer, current_path, target_group)
 	return vim.deepcopy(vim.tbl_extend("force", files[next_index], { group = target_group }))
 end
 
+local function focus_result_window(session)
+	if session and session.result_win and vim.api.nvim_win_is_valid(session.result_win) then
+		vim.api.nvim_set_current_win(session.result_win)
+	end
+end
+
+local function has_active_conflict_blocks(session)
+	if not session or not session.result_bufnr or not session.conflict_blocks then
+		return false
+	end
+
+	local ok, tracking = pcall(require, "codediff.ui.conflict.tracking")
+	if not ok then
+		return true
+	end
+
+	for _, block in ipairs(session.conflict_blocks) do
+		if tracking.is_block_active(session, block) then
+			return true
+		end
+	end
+
+	return false
+end
+
+local function write_result_buffer(session)
+	if not session or not session.result_bufnr or not vim.api.nvim_buf_is_valid(session.result_bufnr) then
+		return true
+	end
+
+	if not vim.bo[session.result_bufnr].modified then
+		return true
+	end
+
+	local ok, err = pcall(vim.api.nvim_buf_call, session.result_bufnr, function()
+		vim.cmd("silent write")
+	end)
+	if not ok then
+		vim.notify("Failed to write merge result: " .. tostring(err), vim.log.levels.ERROR)
+		focus_result_window(session)
+		return false
+	end
+
+	return true
+end
+
 local function filter_status_result(explorer, status_result)
 	if not explorer or not explorer.hide_untracked then
 		return status_result
@@ -327,7 +373,7 @@ local function get_stage_context(get_codediff_lifecycle, tabpage)
 			file_path = node.data.path
 		end
 		group = node.data.group
-	elseif current_buf == original_bufnr or current_buf == modified_bufnr then
+	elseif current_buf == original_bufnr or current_buf == modified_bufnr or current_buf == session.result_bufnr then
 		local original_path, modified_path = lifecycle.get_paths(tabpage)
 		local preferred_path = modified_path
 
@@ -356,6 +402,7 @@ local function get_stage_context(get_codediff_lifecycle, tabpage)
 		explorer = explorer,
 		explorer_ui = explorer_ui,
 		git = git,
+		session = session,
 		current_buf = current_buf,
 		file_path = file_path,
 		directory_path = directory_path,
@@ -454,7 +501,9 @@ function M.stage_entry(get_codediff_lifecycle, tabpage)
 	end
 
 	if context.is_directory then
-		if context.group == "unstaged" or context.group == "conflicts" then
+		if context.group == "conflicts" then
+			vim.notify("Resolve conflict files before staging a merge directory", vim.log.levels.WARN)
+		elseif context.group == "unstaged" then
 			context.explorer_ui.toggle_stage_entry(context.explorer, context.explorer.tree)
 		else
 			vim.notify("Current entry is already staged", vim.log.levels.WARN)
@@ -473,6 +522,18 @@ function M.stage_entry(get_codediff_lifecycle, tabpage)
 
 	if context.group ~= "unstaged" and context.group ~= "conflicts" then
 		return
+	end
+
+	if context.group == "conflicts" then
+		if has_active_conflict_blocks(context.session) then
+			vim.notify("Resolve the merge result before staging", vim.log.levels.WARN)
+			focus_result_window(context.session)
+			return
+		end
+
+		if not write_result_buffer(context.session) then
+			return
+		end
 	end
 
 	local next_file = get_next_file_in_group(context.explorer, context.file_path, context.group)
@@ -531,10 +592,17 @@ function M.stage_entries(get_codediff_lifecycle, tabpage, start_line, end_line)
 	end
 
 	local files = {}
+	local skipped_conflicts = false
 	for _, file_data in ipairs(review.get_files_in_range(context.explorer, start_line, end_line)) do
-		if file_data.group == "unstaged" or file_data.group == "conflicts" then
+		if file_data.group == "unstaged" then
 			files[#files + 1] = file_data
+		elseif file_data.group == "conflicts" then
+			skipped_conflicts = true
 		end
+	end
+
+	if skipped_conflicts then
+		vim.notify("Resolve merge result files before staging conflicts", vim.log.levels.WARN)
 	end
 
 	run_batch_stage_action(context.explorer, files, context.git.stage_file)

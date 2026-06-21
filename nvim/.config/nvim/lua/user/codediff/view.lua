@@ -8,6 +8,7 @@ local review = require("user.codediff.review")
 local resume = require("user.codediff.resume")
 
 local statusline_state_by_tabpage = {}
+local result_zoom_state_by_tabpage = {}
 
 local function get_explorer_winid(explorer)
 	if not explorer then
@@ -24,6 +25,66 @@ local function disable_panel_scrollbind(winid)
 
 	vim.wo[winid].scrollbind = false
 	vim.wo[winid].cursorbind = false
+end
+
+local function is_effectively_empty_buffer(bufnr)
+	if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+		return false
+	end
+
+	local line_count = vim.api.nvim_buf_line_count(bufnr)
+	if line_count == 0 then
+		return true
+	end
+
+	if line_count == 1 then
+		local line = vim.api.nvim_buf_get_lines(bufnr, 0, 1, false)[1]
+		return line == nil or line == ""
+	end
+
+	return false
+end
+
+local function reset_one_sided_conflict_view(tabpage)
+	local lifecycle = adapter.loaded_lifecycle()
+	local session = lifecycle and lifecycle.get_session(tabpage) or nil
+	if not session or not session.result_bufnr then
+		return
+	end
+
+	local original_win = session.original_win
+	local modified_win = session.modified_win
+	if
+		not original_win
+		or not modified_win
+		or not vim.api.nvim_win_is_valid(original_win)
+		or not vim.api.nvim_win_is_valid(modified_win)
+	then
+		return
+	end
+
+	local original_empty = is_effectively_empty_buffer(session.original_bufnr)
+	local modified_empty = is_effectively_empty_buffer(session.modified_bufnr)
+	if original_empty == modified_empty then
+		return
+	end
+
+	local current_win = vim.api.nvim_get_current_win()
+	for _, winid in ipairs({ original_win, modified_win, session.result_win }) do
+		if winid and vim.api.nvim_win_is_valid(winid) then
+			vim.wo[winid].scrollbind = false
+			pcall(vim.api.nvim_win_set_cursor, winid, { 1, 0 })
+		end
+	end
+	for _, winid in ipairs({ original_win, modified_win, session.result_win }) do
+		if winid and vim.api.nvim_win_is_valid(winid) then
+			vim.wo[winid].scrollbind = true
+		end
+	end
+
+	if current_win and vim.api.nvim_win_is_valid(current_win) then
+		vim.api.nvim_set_current_win(current_win)
+	end
 end
 
 local function path_exists(path)
@@ -287,6 +348,7 @@ function M.clear_statusline_state(tabpage)
 	tabpage = get_statusline_tabpage(tabpage)
 	if tabpage then
 		statusline_state_by_tabpage[tabpage] = nil
+		result_zoom_state_by_tabpage[tabpage] = nil
 	end
 end
 
@@ -301,6 +363,13 @@ local function ensure_editable_added_file_override(tabpage, explorer)
 		lsp.prepare_selection(explorer, file_data)
 		original_on_file_select(file_data, opts)
 		lsp.apply_to_session(adapter.loaded_lifecycle(), tabpage)
+		if file_data and file_data.group == "conflicts" then
+			vim.defer_fn(function()
+				if vim.api.nvim_tabpage_is_valid(tabpage) then
+					reset_one_sided_conflict_view(tabpage)
+				end
+			end, 80)
+		end
 
 		show_added_file_as_editable(tabpage, explorer, file_data)
 		ensure_added_file_stays_staged(tabpage, explorer, file_data)
@@ -725,6 +794,70 @@ function M.focus_diff_window(get_codediff_lifecycle, tabpage)
 	end
 
 	vim.api.nvim_set_current_win(target_win)
+	return true
+end
+
+function M.toggle_result_zoom(get_codediff_lifecycle, tabpage)
+	local lifecycle = get_codediff_lifecycle()
+	if not lifecycle then
+		return false
+	end
+
+	tabpage = tabpage or vim.api.nvim_get_current_tabpage()
+	local session = lifecycle.get_session(tabpage)
+	if not session then
+		vim.notify("Current tab is not an active codediff view", vim.log.levels.WARN)
+		return false
+	end
+
+	local result_bufnr, result_win
+	if type(lifecycle.get_result) == "function" then
+		result_bufnr, result_win = lifecycle.get_result(tabpage)
+	else
+		result_bufnr, result_win = session.result_bufnr, session.result_win
+	end
+
+	if not result_bufnr or not vim.api.nvim_buf_is_valid(result_bufnr) then
+		vim.notify("Current CodeDiff view has no merge result buffer", vim.log.levels.WARN)
+		return false
+	end
+
+	if not result_win or not vim.api.nvim_win_is_valid(result_win) then
+		for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+			if vim.api.nvim_win_get_buf(winid) == result_bufnr then
+				result_win = winid
+				break
+			end
+		end
+	end
+
+	if not result_win or not vim.api.nvim_win_is_valid(result_win) then
+		vim.notify("CodeDiff merge result window is not visible", vim.log.levels.WARN)
+		return false
+	end
+
+	local state = result_zoom_state_by_tabpage[tabpage]
+	if state then
+		result_zoom_state_by_tabpage[tabpage] = nil
+		if state.restore_cmd and state.restore_cmd ~= "" then
+			vim.cmd(state.restore_cmd)
+		end
+		if state.previous_win and vim.api.nvim_win_is_valid(state.previous_win) then
+			vim.api.nvim_set_current_win(state.previous_win)
+		elseif vim.api.nvim_win_is_valid(result_win) then
+			vim.api.nvim_set_current_win(result_win)
+		end
+		return true
+	end
+
+	result_zoom_state_by_tabpage[tabpage] = {
+		restore_cmd = vim.fn.winrestcmd(),
+		previous_win = vim.api.nvim_get_current_win(),
+	}
+
+	vim.api.nvim_set_current_win(result_win)
+	vim.cmd("wincmd _")
+	vim.cmd("wincmd |")
 	return true
 end
 

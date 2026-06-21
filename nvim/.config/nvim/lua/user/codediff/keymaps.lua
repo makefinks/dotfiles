@@ -17,6 +17,7 @@ local custom_codediff_keymaps = {
 	"<leader>gu",
 	"<leader>gx",
 	"<leader>gR",
+	"<leader>gZ",
 	"r",
 	"]r",
 	"[r",
@@ -293,6 +294,16 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 		{ desc = "Close codediff view" }
 	)
 
+	lifecycle.set_tab_keymap(
+		tabpage,
+		"n",
+		"<leader>gZ",
+		wrap_tab_action(tabpage, get_codediff_lifecycle, function()
+			deps.view.toggle_result_zoom(get_codediff_lifecycle, tabpage)
+		end),
+		{ desc = "Toggle merge result zoom" }
+	)
+
 	local original_bufnr, modified_bufnr = lifecycle.get_buffers(tabpage)
 	if session.mode == "explorer" then
 		local navigation = adapter.navigation(nil, { "next_hunk", "prev_hunk" }, {
@@ -341,6 +352,13 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 			set_buffer_keymap(bufnr, "[r", function()
 				jump_unreviewed(tabpage, get_codediff_lifecycle, deps, -1)
 			end, "Previous unreviewed CodeDiff file")
+		end
+
+		if type(lifecycle.get_result) == "function" then
+			local result_bufnr = lifecycle.get_result(tabpage)
+			set_buffer_keymap(result_bufnr, "<leader>gz", function()
+				deps.actions.stage_entry(get_codediff_lifecycle, tabpage)
+			end, "Stage resolved merge result")
 		end
 	end
 
