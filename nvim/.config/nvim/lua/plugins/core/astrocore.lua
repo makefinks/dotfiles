@@ -21,6 +21,22 @@ local function get_current_path()
 	return vim.fn.expand("%:.")
 end
 
+local function get_current_absolute_path()
+	if vim.bo.filetype == "neo-tree" then
+		local ok, manager = pcall(require, "neo-tree.sources.manager")
+		if ok then
+			local state = manager.get_state_for_window()
+			local node = state and state.tree and state.tree:get_node() or nil
+			local node_path = node and node:get_id() or nil
+			if node_path and node_path ~= "" then
+				return vim.fn.fnamemodify(node_path, ":p")
+			end
+		end
+	end
+
+	return vim.fn.expand("%:p")
+end
+
 local function yank_path(path, title)
 	if path == nil or path == "" then
 		return
@@ -131,6 +147,12 @@ return {
 					end,
 					desc = "Yank relative file path",
 				},
+				["<Leader>yP"] = {
+					function()
+						yank_path(get_current_absolute_path(), "Path")
+					end,
+					desc = "Yank absolute file path",
+				},
 			},
 			x = {
 				["<Leader>yp"] = {
@@ -148,6 +170,22 @@ return {
 						yank_path(selection, "Path + Lines")
 					end,
 					desc = "Yank relative file path with selected line range",
+				},
+				["<Leader>yP"] = {
+					function()
+						local path = get_current_absolute_path()
+						if path == nil or path == "" then
+							return
+						end
+						local start_line = vim.fn.line("v")
+						local end_line = vim.api.nvim_win_get_cursor(0)[1]
+						local from_line = math.min(start_line, end_line)
+						local to_line = math.max(start_line, end_line)
+						local selection = from_line == to_line and string.format("%s:%d", path, from_line)
+							or string.format("%s:%d-%d", path, from_line, to_line)
+						yank_path(selection, "Path + Lines")
+					end,
+					desc = "Yank absolute file path with selected line range",
 				},
 			},
 		},

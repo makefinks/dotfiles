@@ -1,6 +1,9 @@
 return {
 	"nvim-neo-tree/neo-tree.nvim",
 	opts = {
+		clipboard = {
+			sync = "universal",
+		},
 		window = {
 			width = 50,
 			mapping_options = {
@@ -34,7 +37,18 @@ return {
 				hide_dotfiles = false,
 				hide_gitignored = false,
 				hide_hidden = true,
-				never_show = { "node_modules", ".venv", "venv", "__pycache__", ".pytest_cache", "dist", "build", ".next", ".nuxt", "target" },
+				never_show = {
+					"node_modules",
+					".venv",
+					"venv",
+					"__pycache__",
+					".pytest_cache",
+					"dist",
+					"build",
+					".next",
+					".nuxt",
+					"target",
+				},
 			},
 			follow_current_file = {
 				enabled = true,
