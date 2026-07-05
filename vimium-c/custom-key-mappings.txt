@@ -1,0 +1,46 @@
+# Link hints
+map s LinkHints.activate characters="sadjklewcmpgh"
+map S LinkHints.activateOpenInNewTab characters="sadjklewcmpgh"
+unmap f
+
+# Neovim-style page scrolling
+unmap d
+unmap u
+map <c-d> scrollPageDown
+map <c-u> scrollPageUp
+
+# Tab selection
+map <c-b>0 firstTab
+map <c-b>1 firstTab count=2
+map <c-b>2 firstTab count=3
+map <c-b>3 firstTab count=4
+map <c-b>4 firstTab count=5
+map <c-b>5 firstTab count=6
+map <c-b>6 firstTab count=7
+map <c-b>7 firstTab count=8
+map <c-b>8 firstTab count=9
+map <c-b>9 lastTab
+
+# Search and tab switcher
+map ff Vomnibar.activate
+map <space>fb Vomnibar.activateTabs
+map <space>fw Vomnibar.activate keyword="g"
+map <space>fW Vomnibar.activateInNewTab keyword="g"
+
+# Neovim-style jump navigation for browser history
+unmap H
+unmap L
+map <c-o> goBack
+map <c-i> goForward
+
+# Close tabs
+unmap x
+map <c-q> removeTab
+
+# Yank current page
+map <space>yp copyWindowInfo type="url"
+map <space>yP copyWindowInfo type="tab" format="${title}: ${url}"
+
+# Disable reload and new tab defaults
+unmap r
+unmap t

@@ -2,8 +2,6 @@
 
 Personal configuration files for Zsh, Neovim, tmux, and Ghostty.
 
-AI prompt/agent files under `ai/` are intentionally local-only and ignored by git.
-
 ## Install
 
 ```bash
@@ -11,16 +9,12 @@ AI prompt/agent files under `ai/` are intentionally local-only and ignored by gi
 ```
 
 The script will:
+
 - Auto-detect OS and install dependencies (stow, zsh, neovim, tmux, and supporting tools)
 - Clone or update Oh My Zsh and the Powerlevel10k theme
-- Create symlinks for all configs
+- Create symlinks for `zsh`, `nvim`, `tmux`, and `ghostty` with GNU Stow
 - Back up existing files to `~/.dotfiles_backup_<timestamp>`
-
-After setup, you can make Zsh your default shell manually with:
-
-```bash
-chsh -s "$(command -v zsh)"
-```
+- Add a source line to `~/.zshrc` for the managed Oh My Zsh config
 
 ## What's included
 
@@ -29,10 +23,4 @@ chsh -s "$(command -v zsh)"
 - **ghostty** - Terminal emulator config
 - **zsh** - Oh My Zsh config with the Powerlevel10k prompt
 
-## Validate
-
-```bash
-./scripts/check.sh
-```
-
-This formats/lints shell and Lua files, then runs the Neovim test suite.
+Only `zsh`, `nvim`, `tmux`, and `ghostty` are stowed by `setup.sh`.

@@ -92,20 +92,19 @@ pip install pynvim
 
 ## Plugin Overview
 
-| Plugin               | Purpose                  | Home | Work | Details                                                                                            |
-| -------------------- | ------------------------ | ---- | ---- | -------------------------------------------------------------------------------------------------- |
-| **fff**              | File picker              | ✓    | ✓    | Super fast + Typo resistant + project aware file picker                                            |
-| **neogit**           | Git integration          | ✓    | ✓    | Magit-style Git interface within Neovim for staging, committing, branching, and viewing diffs      |
-| **flash**            | Enhanced search & motion | ✓    | ✓    | Super-fast navigation with labels for jumping to any location in visible text                      |
-| **conform**          | Code formatting          | ✓    | ✓    | Configurable formatters per filetype (StyLua, Prettier, Ruff, etc.)                                |
-| **noice**            | Enhanced command line    | ✓    | ✓    | Replaces default cmdline with better UI, notifications, and command history                        |
-| **snacks**           | Utility collection       | ✓    | ✓    | Provides dashboard, notifications, file picker and other UI utils                                  |
-| **toggleterm**       | Terminal management      | ✓    | ✓    | Quick terminal access with customizable layouts (horizontal/vertical/float)                        |
-| **autopairs**        | Auto-closing brackets    | ✓    | ✓    | Automatically closes brackets, quotes, and pairs with smart rules for different filetypes          |
-| **yanky**            | Yank ring and paste history | ✓ | ✓ | Improves yank and put behavior with history cycling, highlighting, and a picker                    |
-| **resession**        | Session management       | ✓    | ✓    | Auto-saves and restores workspace sessions including open files, cursor positions, and layout      |
-| **markdown-preview** | Live markdown preview    | ✓    | ✓    | Real-time preview of markdown files with GitHub-style rendering                                    |
-| **startup-time**     | Performance monitoring   | ✓    | ✓    | Tracks and displays Neovim startup time for optimization                                           |
+This list tracks the top-level plugins configured in `lua/plugins/`. AstroNvim and AstroCommunity provide additional core plugins and dependencies.
+
+| Area | Plugins | Details |
+| ---- | ------- | ------- |
+| Navigation | **fff.nvim**, **fzf-lua**, **flash.nvim**, **portal.nvim**, **neo-tree.nvim**, **telescope.nvim** | File picking, fuzzy finding, jump navigation, project tree, and portal-style movement |
+| Git | **neogit**, **codediff.nvim**, **gitsigns.nvim** | Git UI, project/file diff review workflows, signs, hunks, and blame integration |
+| LSP and completion | **AstroLSP**, **blink.cmp**, **mason.nvim**, **mason-tool-installer**, **conform.nvim**, **nvim-treesitter**, **glance.nvim**, **venv-selector.nvim** | Language servers, completion, formatting, syntax parsing, references/definitions UI, and Python env selection |
+| UI | **astroui**, **heirline.nvim**, **noice.nvim**, **cyberdream.nvim**, **tokyonight.nvim**, **smart-splits.nvim** | Theme, statusline, command/message UI, and window navigation/resizing |
+| Editing | **nvim-autopairs**, **yanky.nvim**, **snacks.nvim** | Pair insertion, yank history, pickers, notifications, dashboard, and utility UI |
+| Markdown | **render-markdown.nvim**, **live-preview.nvim** | In-editor markdown rendering and browser preview |
+| Terminal | **toggleterm.nvim** | Managed floating, horizontal, and vertical terminals |
+| Workflow | **resession.nvim**, **vim-startuptime**, **mole.nvim**, **doubt.nvim** | Session saving, startup profiling, annotation/review sessions, and local workflow tooling |
+| Debugging | **nvim-dap**, **nvim-dap-view** | Debug adapter integration with a persistent debugger UI |
 
 ## Validate
 
