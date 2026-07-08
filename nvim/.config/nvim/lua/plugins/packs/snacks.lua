@@ -136,7 +136,9 @@ return {
 		}
 	end,
 	config = function(_, opts)
-		require("snacks").setup(opts)
+		local snacks = require("snacks")
+		snacks.setup(opts)
+		require("user.snacks_image").disable_codediff_document_images(snacks)
 
 		-- Customize dashboard header colors for Tokyo Night
 		vim.api.nvim_set_hl(0, "SnacksDashboardHeader", { fg = "#e0af68" })
