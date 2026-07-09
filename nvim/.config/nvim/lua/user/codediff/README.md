@@ -59,3 +59,11 @@ Explorer-specific:
 
 - `<CR>`: open file or expand/collapse tree node
 - `<Tab>` / `<S-Tab>`: next / previous file
+
+## Merge conflicts
+
+Conflict views use a three-way layout without resizing the panes:
+
+- Incoming hunks use a cyan tint; current hunks use violet; unresolved result hunks use amber.
+- Each source hunk has an action strip showing the accept, combine, and ignore mappings.
+- The result pane states when no choice has been accepted yet.

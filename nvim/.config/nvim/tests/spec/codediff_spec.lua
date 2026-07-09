@@ -493,6 +493,110 @@ describe("local CodeDiff workflow", function()
 		end, 10000, "Resolved merge result was not staged")
 	end)
 
+	it("makes conflict panes readable with labelled, color-coded headers and absolute line numbers", function()
+		local conflict_labels = require("user.codediff.conflict_labels")
+		local _, session = open_conflict_file()
+
+		conflict_labels.apply_session_ui(session)
+
+		assert.is_true(vim.wo[session.original_win].number)
+		assert.is_false(vim.wo[session.original_win].relativenumber)
+		assert.is_true(vim.wo[session.modified_win].number)
+		assert.is_false(vim.wo[session.modified_win].relativenumber)
+		assert.is_true(vim.wo[session.result_win].number)
+		assert.is_false(vim.wo[session.result_win].relativenumber)
+		assert.matches("INCOMING · feature", vim.wo[session.original_win].winbar)
+		assert.matches("CURRENT · main", vim.wo[session.modified_win].winbar)
+		assert.matches("RESULT", vim.wo[session.result_win].winbar)
+
+		local function has_hunk_style(bufnr, highlight)
+			for _, mark in
+				ipairs(vim.api.nvim_buf_get_extmarks(bufnr, conflict_labels.get_namespace(), 0, -1, { details = true }))
+			do
+				if mark[4].line_hl_group == highlight then
+					return true
+				end
+			end
+			return false
+		end
+
+		assert.is_true(has_hunk_style(session.original_bufnr, "UserCodeDiffConflictIncomingLine"))
+		assert.is_true(has_hunk_style(session.modified_bufnr, "UserCodeDiffConflictCurrentLine"))
+		assert.is_true(has_hunk_style(session.result_bufnr, "UserCodeDiffConflictResultLine"))
+
+		local incoming_marks = vim.api.nvim_buf_get_extmarks(
+			session.original_bufnr,
+			conflict_labels.get_namespace(),
+			0,
+			-1,
+			{ details = true }
+		)
+		local action_bar = vim.inspect(incoming_marks)
+		assert.matches("UserCodeDiffConflictIncomingAction", action_bar)
+		assert.matches("UserCodeDiffConflictCombineAction", action_bar)
+		assert.matches("UserCodeDiffConflictIgnoreAction", action_bar)
+	end)
+
+	it("keeps all three panes focused on the same conflict", function()
+		local conflict_labels = require("user.codediff.conflict_labels")
+		local _, session = open_conflict_file()
+		local tracking = require("codediff.ui.conflict.tracking")
+		local block = session.conflict_blocks[1]
+
+		vim.api.nvim_set_current_win(session.modified_win)
+		vim.api.nvim_win_set_cursor(session.modified_win, { block.output2_range.start_line, 0 })
+		conflict_labels.sync_current_conflict(vim.api.nvim_get_current_tabpage())
+
+		assert.are.equal(
+			tracking.get_block_start_line(session, block, session.original_bufnr),
+			vim.api.nvim_win_get_cursor(session.original_win)[1]
+		)
+		assert.are.equal(
+			tracking.get_block_start_line(session, block, session.modified_bufnr),
+			vim.api.nvim_win_get_cursor(session.modified_win)[1]
+		)
+		assert.are.equal(
+			tracking.get_block_start_line(session, block, session.result_bufnr),
+			vim.api.nvim_win_get_cursor(session.result_win)[1]
+		)
+	end)
+
+	it("resolves the focused conflict directly from the result pane", function()
+		local conflict_labels = require("user.codediff.conflict_labels")
+		local _, session = open_conflict_file()
+		local tracking = require("codediff.ui.conflict.tracking")
+		local block = session.conflict_blocks[1]
+
+		vim.api.nvim_set_current_win(session.result_win)
+		vim.api.nvim_win_set_cursor(
+			session.result_win,
+			{ tracking.get_block_start_line(session, block, session.result_bufnr), 0 }
+		)
+
+		assert.is_true(h.buffer_has_keymap(session.result_bufnr, "<leader>ct"))
+		conflict_labels.resolve_from_result(vim.api.nvim_get_current_tabpage(), "incoming")
+
+		assert.is_false(tracking.is_block_active(session, block))
+		assert.are.equal(session.result_win, vim.api.nvim_get_current_win())
+	end)
+
+	it("scrolls the result pane to a conflict resolved from a source pane", function()
+		local _, session = open_conflict_file()
+		local tracking = require("codediff.ui.conflict.tracking")
+		local actions = require("codediff.ui.conflict.actions")
+		local block = session.conflict_blocks[1]
+
+		vim.api.nvim_set_current_win(session.original_win)
+		vim.api.nvim_win_set_cursor(session.original_win, { block.output1_range.start_line, 0 })
+		actions.accept_incoming(vim.api.nvim_get_current_tabpage())
+
+		assert.are.equal(
+			tracking.get_block_start_line(session, block, session.result_bufnr),
+			vim.api.nvim_win_get_cursor(session.result_win)[1]
+		)
+		assert.are.equal(session.original_win, vim.api.nvim_get_current_win())
+	end)
+
 	it("marks files reviewed and advances to the next unreviewed file from diff buffers", function()
 		repo = create_two_modified_files_repo()
 		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
