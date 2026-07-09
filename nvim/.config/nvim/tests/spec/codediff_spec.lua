@@ -597,6 +597,20 @@ describe("local CodeDiff workflow", function()
 		assert.are.equal(session.original_win, vim.api.nvim_get_current_win())
 	end)
 
+	it("clears conflict action labels when leaving the diff view", function()
+		local conflict_labels = require("user.codediff.conflict_labels")
+		local tabpage, session = open_conflict_file()
+		local result_bufnr = session.result_bufnr
+
+		assert.is_true(#vim.api.nvim_buf_get_extmarks(result_bufnr, conflict_labels.get_namespace(), 0, -1, {}) > 0)
+		vim.api.nvim_exec_autocmds("User", {
+			pattern = "CodeDiffClose",
+			data = { tabpage = tabpage, mode = session.mode },
+		})
+
+		assert.are.equal(0, #vim.api.nvim_buf_get_extmarks(result_bufnr, conflict_labels.get_namespace(), 0, -1, {}))
+	end)
+
 	it("marks files reviewed and advances to the next unreviewed file from diff buffers", function()
 		repo = create_two_modified_files_repo()
 		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
@@ -773,6 +787,11 @@ describe("local CodeDiff workflow", function()
 
 		assert.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
 		assert.is_nil(h.get_codediff_lifecycle().get_session(tabpage))
+		assert.is_nil(view.get_statusline_state(tabpage))
+		assert.is_false(view.is_statusline_active(tabpage))
+		assert.is_nil(vim.b[vim.api.nvim_get_current_buf()].codediff_status_name)
+		assert.is_nil(vim.b[vim.api.nvim_get_current_buf()].codediff_status_progress)
+		assert.is_nil(vim.b[vim.api.nvim_get_current_buf()].codediff_review_progress)
 	end)
 
 	it("resumes the last codediff session at the saved diff cursor", function()

@@ -8,18 +8,31 @@ return {
 				return package.loaded["user.codediff.view"]
 			end
 
+			local function codediff_statusline_active()
+				local view = codediff_view()
+				return view and view.is_statusline_active and view.is_statusline_active() or false
+			end
+
 			local function codediff_statusline_state()
+				if not codediff_statusline_active() then
+					return nil
+				end
+
 				local view = codediff_view()
 				return view and view.get_statusline_state and view.get_statusline_state() or nil
 			end
 
 			local function codediff_statusline_progress()
+				if not codediff_statusline_active() then
+					return nil
+				end
+
 				local state = codediff_statusline_state()
 				return state and state.progress or vim.b.codediff_status_progress
 			end
 
 			local function not_codediff()
-				return codediff_statusline_progress() == nil
+				return not codediff_statusline_active()
 			end
 
 			local function hunk_progress()
@@ -69,9 +82,9 @@ return {
 						fname = function(nr)
 							local bufnr = nr and vim.api.nvim_buf_is_valid(nr) and nr or vim.api.nvim_get_current_buf()
 							local state = codediff_statusline_state()
-							return vim.b[bufnr].codediff_status_name
-								or state and state.name
-								or vim.api.nvim_buf_get_name(bufnr)
+							local codediff_name = codediff_statusline_active()
+								and (vim.b[bufnr].codediff_status_name or state and state.name)
+							return codediff_name or vim.api.nvim_buf_get_name(bufnr)
 						end,
 						fallback = "Empty",
 					},

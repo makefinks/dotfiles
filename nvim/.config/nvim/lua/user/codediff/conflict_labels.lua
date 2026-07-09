@@ -421,6 +421,18 @@ function M.install(group)
 			group = group,
 			callback = set_highlights,
 		})
+		vim.api.nvim_create_autocmd("User", {
+			group = group,
+			pattern = "CodeDiffClose",
+			callback = function(args)
+				local lifecycle = require("codediff.ui.lifecycle")
+				local tabpage = args.data and args.data.tabpage or vim.api.nvim_get_current_tabpage()
+				local session = lifecycle.get_session(tabpage)
+				if session then
+					clear_session_labels(session)
+				end
+			end,
+		})
 	end
 
 	local ok_signs, signs = pcall(require, "codediff.ui.conflict.signs")

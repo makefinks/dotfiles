@@ -344,12 +344,46 @@ function M.get_statusline_state(tabpage)
 	return statusline_state_by_tabpage[tabpage]
 end
 
+function M.is_statusline_active(tabpage)
+	tabpage = get_statusline_tabpage(tabpage)
+	if not tabpage then
+		return false
+	end
+
+	local lifecycle = adapter.loaded_lifecycle()
+	return lifecycle and lifecycle.get_session(tabpage) ~= nil or false
+end
+
 function M.clear_statusline_state(tabpage)
 	tabpage = get_statusline_tabpage(tabpage)
-	if tabpage then
-		statusline_state_by_tabpage[tabpage] = nil
-		result_zoom_state_by_tabpage[tabpage] = nil
+	if not tabpage then
+		return
 	end
+
+	local lifecycle = adapter.loaded_lifecycle()
+	local session = lifecycle and lifecycle.get_session(tabpage) or nil
+	if session then
+		local explorer = lifecycle.get_explorer(tabpage)
+		for _, bufnr in pairs({
+			session.original_bufnr,
+			session.modified_bufnr,
+			session.result_bufnr,
+			explorer and explorer.bufnr or nil,
+		}) do
+			if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+				vim.b[bufnr].codediff_status_name = nil
+				vim.b[bufnr].codediff_status_progress = nil
+				vim.b[bufnr].codediff_review_progress = nil
+			end
+		end
+	end
+
+	statusline_state_by_tabpage[tabpage] = nil
+	result_zoom_state_by_tabpage[tabpage] = nil
+	vim.cmd.redrawstatus()
+	vim.schedule(function()
+		vim.cmd.redrawstatus()
+	end)
 end
 
 local function ensure_editable_added_file_override(tabpage, explorer)
