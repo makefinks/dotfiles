@@ -47,18 +47,36 @@ local function yank_path(path, title)
 	Snacks.notifier.notify("Copied: " .. path, "info", { title = title })
 end
 
-local function open_current_folder_in_finder()
+local function get_file_manager_command()
+	if vim.fn.has("macunix") == 1 then
+		return "open"
+	end
+	if vim.fn.has("wsl") == 1 and vim.fn.executable("explorer.exe") == 1 then
+		return "explorer.exe"
+	end
+	if vim.fn.executable("xdg-open") == 1 then
+		return "xdg-open"
+	end
+end
+
+local function open_current_folder_in_file_manager()
 	local path = get_current_path()
 	if path == nil or path == "" then
-		Snacks.notifier.notify("No file path to open", "warn", { title = "Finder" })
+		Snacks.notifier.notify("No file path to open", "warn", { title = "File Manager" })
 		return
 	end
 
 	local absolute_path = vim.fn.fnamemodify(path, ":p")
 	local dir = vim.fn.isdirectory(absolute_path) == 1 and absolute_path or vim.fn.fnamemodify(absolute_path, ":h")
-	local job_id = vim.fn.jobstart({ "open", dir }, { detach = true })
+	local command = get_file_manager_command()
+	if command == nil then
+		Snacks.notifier.notify("No supported file manager command found", "error", { title = "File Manager" })
+		return
+	end
+
+	local job_id = vim.fn.jobstart({ command, dir }, { detach = true })
 	if job_id <= 0 then
-		Snacks.notifier.notify("Failed to open Finder", "error", { title = "Finder" })
+		Snacks.notifier.notify("Failed to open file manager", "error", { title = "File Manager" })
 	end
 end
 
@@ -112,8 +130,8 @@ return {
 				["<Leader>c"] = false,
 				["<Leader>ff"] = false,
 				["<Leader>fo"] = {
-					open_current_folder_in_finder,
-					desc = "Open folder in Finder",
+					open_current_folder_in_file_manager,
+					desc = "Open folder in file manager",
 				},
 				["<Leader>fs"] = false,
 				["<Leader>fw"] = false,

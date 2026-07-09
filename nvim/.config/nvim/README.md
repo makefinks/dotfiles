@@ -108,12 +108,6 @@ This list tracks the top-level plugins configured in `lua/plugins/`. AstroNvim a
 
 ## Validate
 
-From the repository root:
-
-```bash
-./scripts/check.sh
-```
-
 From this Neovim config directory, the main commands are:
 
 ```bash

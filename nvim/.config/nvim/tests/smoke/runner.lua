@@ -95,6 +95,15 @@ local function ensure_plugin_loaded(plugin_dir, spec_module)
 	configured_plugins[plugin_dir] = true
 end
 
+local function fff_indexed_cwd(picker_dir)
+	local base_path = require("fff.conf").get().base_path
+	return vim.fn.fnamemodify(base_path, ":p") == vim.fn.fnamemodify(picker_dir, ":p")
+end
+
+local function fff_picker_ready(picker_dir)
+	return fff_indexed_cwd(picker_dir) and not require("fff.file_picker").get_scan_progress().is_scanning
+end
+
 local function open_with_snacks_picker()
 	local target = picker_fixtures_dir .. "/snacks/target.txt"
 	local picker_dir = picker_fixtures_dir .. "/snacks"
@@ -127,21 +136,28 @@ local function open_with_fff_picker()
 	local picker_dir = picker_fixtures_dir .. "/fff"
 	ensure_plugin_loaded("fff.nvim", "plugins.navigation.fff")
 	local fff = require("fff")
-	local picker_ui = require("fff.picker_ui")
+	local picker_ui = require("fff.picker_ui.picker_ui")
+	local selected = false
 
-	fff.find_files({ cwd = picker_dir })
+	fff.find_files({
+		cwd = picker_dir,
+		on_submit = function(_, context)
+			selected = true
+			vim.cmd.edit(vim.fn.fnameescape(context.path))
+		end,
+	})
 
 	wait_until("fff picker did not start", function()
 		return picker_ui.state.active
 	end)
 
 	wait_until("fff picker did not produce a selectable item", function()
-		return #picker_ui.state.filtered_items > 0
+		return fff_picker_ready(picker_dir) and #picker_ui.state.filtered_items > 0
 	end, 8000)
 
 	picker_ui.select("edit")
 	wait_until("fff picker did not open target buffer", function()
-		return not picker_ui.state.active and vim.api.nvim_buf_get_name(0) ~= ""
+		return selected and not picker_ui.state.active and vim.api.nvim_buf_get_name(0) ~= ""
 	end)
 	assert_current_buffer(target, "fff picker")
 end
@@ -177,17 +193,25 @@ local function open_with_fff_grep()
 	local picker_dir = picker_fixtures_dir .. "/grep"
 	ensure_plugin_loaded("fff.nvim", "plugins.navigation.fff")
 	local fff = require("fff")
-	local picker_ui = require("fff.picker_ui")
+	local picker_ui = require("fff.picker_ui.picker_ui")
+	local selected = false
 
-	fff.live_grep({ cwd = picker_dir, query = "needle" })
+	fff.live_grep({
+		cwd = picker_dir,
+		query = "needle",
+		on_submit = function(_, context)
+			selected = true
+			vim.cmd.edit(vim.fn.fnameescape(context.path))
+		end,
+	})
 
 	wait_until("fff grep did not produce a selectable item", function()
-		return picker_ui.state.active and #picker_ui.state.filtered_items > 0
+		return picker_ui.state.active and fff_picker_ready(picker_dir) and #picker_ui.state.filtered_items > 0
 	end, 8000)
 
 	picker_ui.select("edit")
 	wait_until("fff grep did not open target buffer", function()
-		return not picker_ui.state.active and vim.api.nvim_buf_get_name(0) ~= ""
+		return selected and not picker_ui.state.active and vim.api.nvim_buf_get_name(0) ~= ""
 	end)
 	assert_current_buffer(target, "fff grep")
 	assert_cursor_line(1, "fff grep")

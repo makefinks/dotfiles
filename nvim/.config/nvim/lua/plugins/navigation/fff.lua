@@ -6,7 +6,7 @@ local function setup_fff_resume_fallback()
 		return
 	end
 
-	local ok, picker_ui = pcall(require, "fff.picker_ui")
+	local ok, picker_ui = pcall(require, "fff.picker_ui.picker_ui")
 	if not ok or picker_ui.__dotfiles_resume_fallback then
 		return
 	end
