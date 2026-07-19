@@ -2,6 +2,13 @@
 set -euo pipefail
 
 PKGS=("nvim" "tmux" "ghostty" "zsh")
+MANAGED_PATHS=(
+	".config/ghostty"
+	".config/nvim"
+	".config/zsh"
+	".tmux.conf"
+	".zshrc.oh-my-zsh"
+)
 TARGET="$HOME"
 BACKUP="$HOME/.dotfiles_backup_$(date +%Y%m%d_%H%M%S)"
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -89,11 +96,15 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
 		pip3 install pynvim
 	elif command -v pacman &>/dev/null; then
 		echo "Installing dependencies via pacman..."
-		sudo pacman -S --noconfirm stow neovim tmux zsh git curl nodejs python python-pip rust fd ripgrep fzf wget imagemagick luarocks shfmt shellcheck
+		arch_packages=(stow neovim tmux ghostty zsh git curl nodejs npm python python-pynvim rust fd ripgrep fzf wget imagemagick luarocks viu shfmt shellcheck)
+		if command -v omarchy &>/dev/null; then
+			omarchy pkg add "${arch_packages[@]}"
+		else
+			sudo pacman -S --needed --noconfirm "${arch_packages[@]}"
+		fi
 
 		echo "Installing neovim language clients..."
 		sudo npm install -g neovim
-		pip install pynvim viu
 	else
 		echo "Unsupported package manager. Please install dependencies manually"
 		exit 1
@@ -107,21 +118,19 @@ echo "Installing Oh My Zsh and Powerlevel10k..."
 clone_or_update_repo "Oh My Zsh" "https://github.com/ohmyzsh/ohmyzsh.git" "$OH_MY_ZSH_DIR"
 clone_or_update_repo "Powerlevel10k" "https://github.com/romkatv/powerlevel10k.git" "$POWERLEVEL10K_DIR"
 
-# Backup any real files that would collide with our links
+# Back up only the application configs owned by this repository. Walking each
+# Stow package also visits .config itself, which would move the entire directory.
 mkdir -p "$BACKUP"
-for pkg in "${PKGS[@]}"; do
-	while IFS= read -r -d '' p; do
-		rel_path="${p#./}"
-		dest="$TARGET/$rel_path"
-		if [[ -e "$dest" && ! -L "$dest" ]]; then
-			mkdir -p "$BACKUP/$(dirname "$rel_path")"
-			mv -v "$dest" "$BACKUP/$rel_path"
-		fi
-	done < <(cd "$pkg" && find . -mindepth 1 -print0)
+for rel_path in "${MANAGED_PATHS[@]}"; do
+	dest="$TARGET/$rel_path"
+	if [[ -e "$dest" && ! -L "$dest" ]]; then
+		mkdir -p "$BACKUP/$(dirname "$rel_path")"
+		mv -v "$dest" "$BACKUP/$rel_path"
+	fi
 done
 
 # Create (or refresh) symlinks
-stow -v -R -t "$TARGET" "${PKGS[@]}"
+stow -v -R --dir="$DOTFILES_DIR" --target="$TARGET" "${PKGS[@]}"
 
 ensure_zshrc_sources_dotfiles
 
