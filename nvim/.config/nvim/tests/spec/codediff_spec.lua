@@ -3,6 +3,9 @@ local h = require("tests.helpers.codediff")
 local original_cwd
 local original_fn_input
 local original_notify
+local original_lsp_buf_request_all
+local original_lsp_get_client_by_id
+local original_lsp_get_clients
 local repo
 local echo_capture
 
@@ -192,6 +195,32 @@ local function with_branch_and_mode(branch, mode, callback)
 	end
 end
 
+local function mock_lsp_locations(locations)
+	original_lsp_get_clients = vim.lsp.get_clients
+	original_lsp_get_client_by_id = vim.lsp.get_client_by_id
+	original_lsp_buf_request_all = vim.lsp.buf_request_all
+
+	vim.lsp.get_clients = function()
+		return { { id = 1, server_capabilities = {} } }
+	end
+	vim.lsp.get_client_by_id = function()
+		return { offset_encoding = "utf-16" }
+	end
+	vim.lsp.buf_request_all = function(_, _, _, callback)
+		callback({ [1] = { result = locations } })
+	end
+end
+
+local function lsp_location(path, line, character)
+	return {
+		uri = vim.uri_from_fname(path),
+		range = {
+			start = { line = line - 1, character = character },
+			["end"] = { line = line - 1, character = character },
+		},
+	}
+end
+
 describe("local CodeDiff workflow", function()
 	before_each(function()
 		original_cwd = vim.fn.getcwd()
@@ -201,6 +230,21 @@ describe("local CodeDiff workflow", function()
 	end)
 
 	after_each(function()
+		if original_lsp_buf_request_all then
+			vim.lsp.buf_request_all = original_lsp_buf_request_all
+			original_lsp_buf_request_all = nil
+		end
+
+		if original_lsp_get_client_by_id then
+			vim.lsp.get_client_by_id = original_lsp_get_client_by_id
+			original_lsp_get_client_by_id = nil
+		end
+
+		if original_lsp_get_clients then
+			vim.lsp.get_clients = original_lsp_get_clients
+			original_lsp_get_clients = nil
+		end
+
 		if original_notify then
 			vim.notify = original_notify
 			original_notify = nil
@@ -271,6 +315,38 @@ describe("local CodeDiff workflow", function()
 		assert.is_true(vim.b[session.modified_bufnr].codediff_lsp_disabled)
 		assert.are.equal("", vim.bo[session.modified_bufnr].filetype)
 		assert.are.equal(0, #vim.lsp.get_clients({ bufnr = session.modified_bufnr }))
+	end)
+
+	it("keeps codediff open for same-file LSP definitions", function()
+		repo = create_two_modified_files_repo()
+		local tabpage, session = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+		local modified_bufnr = h.focus_modified_window(tabpage)
+		mock_lsp_locations(lsp_location(repo.path("alpha.lua"), 1, 0))
+
+		local keymap = vim.fn.maparg("gd", "n", false, true)
+		assert.are.equal("function", type(keymap.callback))
+		keymap.callback()
+
+		assert.are.equal(tabpage, vim.api.nvim_get_current_tabpage())
+		assert.are.equal(session, h.get_codediff_lifecycle().get_session(tabpage))
+		assert.are.equal(modified_bufnr, vim.api.nvim_get_current_buf())
+		assert.are.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
+	end)
+
+	it("closes codediff for cross-file LSP declarations", function()
+		repo = create_two_modified_files_repo()
+		local tabpage = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+		h.focus_modified_window(tabpage)
+		mock_lsp_locations(lsp_location(repo.path("beta.lua"), 1, 0))
+
+		local keymap = vim.fn.maparg("gD", "n", false, true)
+		assert.are.equal("function", type(keymap.callback))
+		keymap.callback()
+
+		h.wait_for(function()
+			return vim.api.nvim_buf_get_name(vim.api.nvim_get_current_buf()) == repo.path("beta.lua")
+				and h.get_codediff_lifecycle().get_session(vim.api.nvim_get_current_tabpage()) == nil
+		end, 10000, "Cross-file declaration did not leave CodeDiff")
 	end)
 
 	it("unstages from hidden diff buffers and reopens with refreshed explorer state", function()

@@ -1,6 +1,7 @@
 local M = {}
 
 local adapter = require("user.codediff.adapter")
+local lsp = require("user.codediff.lsp")
 local visual = require("user.codediff.visual")
 
 local custom_codediff_keymaps = {
@@ -11,6 +12,8 @@ local custom_codediff_keymaps = {
 	"<C-k>",
 	"<C-q>",
 	"q",
+	"gd",
+	"gD",
 	"ff",
 	"<leader>e",
 	"<leader>gc",
@@ -322,6 +325,14 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 		})
 
 		for _, bufnr in ipairs({ original_bufnr, modified_bufnr }) do
+			set_buffer_keymap(bufnr, "gd", function()
+				lsp.jump_to_location(get_codediff_lifecycle, deps.view.close_view, "textDocument/definition")
+			end, "Go to definition outside CodeDiff")
+
+			set_buffer_keymap(bufnr, "gD", function()
+				lsp.jump_to_location(get_codediff_lifecycle, deps.view.close_view, "textDocument/declaration")
+			end, "Go to declaration outside CodeDiff")
+
 			set_buffer_keymap(bufnr, "<CR>", function()
 				deps.view.open_file_from_diff(get_codediff_lifecycle, tabpage)
 			end, "Close codediff and open file at cursor")

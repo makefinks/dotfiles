@@ -45,6 +45,98 @@ local function path_is_pending(path)
 	return path and pending_large_paths[path] == true
 end
 
+local function get_current_file_path(lifecycle, tabpage)
+	local explorer = lifecycle and lifecycle.get_explorer(tabpage) or nil
+	if not explorer then
+		return nil
+	end
+
+	return resolve_path(explorer.git_root, explorer.current_file_path)
+end
+
+local function jump_within_current_diff(item, tagname, from)
+	local winid = vim.api.nvim_get_current_win()
+	vim.cmd("normal! m'")
+	vim.fn.settagstack(winid, { items = { { tagname = tagname, from = from } } }, "t")
+	vim.api.nvim_win_set_cursor(winid, { item.lnum, math.max(item.col - 1, 0) })
+	vim._with({ win = winid }, function()
+		vim.cmd("normal! zv")
+	end)
+end
+
+local function open_outside_codediff(get_codediff_lifecycle, close_view, item)
+	if not close_view(get_codediff_lifecycle) then
+		return
+	end
+
+	vim.schedule(function()
+		local ok = pcall(vim.cmd.edit, vim.fn.fnameescape(item.filename))
+		if not ok then
+			vim.notify(string.format("Failed to open %s", item.filename), vim.log.levels.ERROR)
+			return
+		end
+
+		local winid = vim.api.nvim_get_current_win()
+		vim.api.nvim_win_set_cursor(winid, { item.lnum, math.max(item.col - 1, 0) })
+		vim._with({ win = winid }, function()
+			vim.cmd("normal! zv")
+		end)
+	end)
+end
+
+---Jump to an LSP location without leaving a CodeDiff session for same-file targets.
+---@param get_codediff_lifecycle fun(): table|nil
+---@param close_view fun(get_codediff_lifecycle: fun(): table|nil): boolean
+---@param method vim.lsp.protocol.Method.ClientToServer.Request
+function M.jump_to_location(get_codediff_lifecycle, close_view, method)
+	local bufnr = vim.api.nvim_get_current_buf()
+	local winid = vim.api.nvim_get_current_win()
+	local clients = vim.lsp.get_clients({ bufnr = bufnr, method = method })
+	if not next(clients) then
+		vim.notify(vim.lsp._unsupported_method(method), vim.log.levels.WARN)
+		return
+	end
+
+	local tabpage = vim.api.nvim_get_current_tabpage()
+	local lifecycle = get_codediff_lifecycle()
+	local current_file_path = get_current_file_path(lifecycle, tabpage)
+	local from = vim.fn.getpos(".")
+	from[1] = bufnr
+	local tagname = vim.fn.expand("<cword>")
+
+	vim.lsp.buf_request_all(bufnr, method, function(client)
+		return vim.lsp.util.make_position_params(winid, client.offset_encoding)
+	end, function(results)
+		local items = {}
+		for client_id, result in pairs(results) do
+			local client = vim.lsp.get_client_by_id(client_id)
+			if client and result and result.result then
+				local locations = vim.islist(result.result) and result.result or { result.result }
+				vim.list_extend(items, vim.lsp.util.locations_to_items(locations, client.offset_encoding))
+			end
+		end
+
+		if #items == 0 then
+			vim.notify("No locations found", vim.log.levels.INFO)
+			return
+		end
+
+		if #items > 1 then
+			vim.fn.setqflist({}, " ", { title = "LSP locations", items = items })
+			vim.cmd("botright copen")
+			return
+		end
+
+		local item = items[1]
+		if current_file_path and normalize_path(item.filename) == current_file_path then
+			jump_within_current_diff(item, tagname, from)
+			return
+		end
+
+		open_outside_codediff(get_codediff_lifecycle, close_view, item)
+	end)
+end
+
 function M.disable_for_buffer(bufnr)
 	if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
 		return

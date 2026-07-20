@@ -54,6 +54,7 @@ Inside codediff tabs:
 - `s`: stage current entry
 - `u`: unstage current entry
 - `x`: discard current entry
+- `gd` / `gD`: jump to a definition / declaration; cross-file targets close CodeDiff, while same-file targets stay in the diff
 
 Explorer-specific:
 
