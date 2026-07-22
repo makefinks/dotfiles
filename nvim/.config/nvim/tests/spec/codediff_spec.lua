@@ -333,6 +333,35 @@ describe("local CodeDiff workflow", function()
 		assert.are.same({ 1, 0 }, vim.api.nvim_win_get_cursor(0))
 	end)
 
+	it("restores the buffer LSP definition mapping after codediff closes", function()
+		repo = create_two_modified_files_repo()
+		local tabpage, session = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+		local file_bufnr = h.focus_modified_window(tabpage)
+		local definition_called = false
+		vim.keymap.set("n", "gd", function()
+			definition_called = true
+		end, { buffer = file_bufnr, desc = "Test LSP definition" })
+
+		require("user.codediff.keymaps").set_tab_keymaps(tabpage, h.get_codediff_lifecycle, {
+			actions = require("user.codediff.actions"),
+			review = require("user.codediff.review"),
+			view = require("user.codediff.view"),
+		})
+		assert.are_not.equal("Test LSP definition", vim.fn.maparg("gd", "n", false, true).desc)
+
+		require("user.codediff.view").close_view(h.get_codediff_lifecycle)
+		h.wait_for(function()
+			return h.get_codediff_lifecycle().get_session(tabpage) == nil
+		end, 10000, "CodeDiff did not close")
+
+		assert.is_true(vim.api.nvim_buf_is_valid(session.modified_bufnr))
+		vim.api.nvim_set_current_buf(file_bufnr)
+		local restored = vim.fn.maparg("gd", "n", false, true)
+		assert.are.equal("Test LSP definition", restored.desc)
+		restored.callback()
+		assert.is_true(definition_called)
+	end)
+
 	it("closes codediff for cross-file LSP declarations", function()
 		repo = create_two_modified_files_repo()
 		local tabpage = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })

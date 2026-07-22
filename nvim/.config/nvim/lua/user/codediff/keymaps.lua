@@ -4,32 +4,45 @@ local adapter = require("user.codediff.adapter")
 local lsp = require("user.codediff.lsp")
 local visual = require("user.codediff.visual")
 
-local custom_codediff_keymaps = {
-	"<CR>",
-	"<Tab>",
-	"<S-Tab>",
-	"<C-j>",
-	"<C-k>",
-	"<C-q>",
-	"q",
-	"gd",
-	"gD",
-	"ff",
-	"<leader>e",
-	"<leader>gc",
-	"<leader>gz",
-	"<leader>gu",
-	"<leader>gx",
-	"<leader>gR",
-	"<leader>gZ",
-	"r",
-	"]r",
-	"[r",
-	"s",
-	"u",
-	"x",
-}
 local tracked_keymap_buffers = {}
+local overridden_buffer_keymaps = {}
+
+local function get_buffer_keymap(bufnr, mode, lhs)
+	if not (bufnr and vim.api.nvim_buf_is_valid(bufnr)) then
+		return nil
+	end
+
+	local mapping
+	vim.api.nvim_buf_call(bufnr, function()
+		local current = vim.fn.maparg(lhs, mode, false, true)
+		if type(current) == "table" and current.buffer == 1 then
+			mapping = current
+		end
+	end)
+	return mapping
+end
+
+local function restore_buffer_keymap(bufnr, mode, lhs, mapping)
+	if not mapping then
+		pcall(vim.keymap.del, mode, lhs, { buffer = bufnr })
+		return
+	end
+
+	local rhs = mapping.callback or mapping.rhs
+	if not rhs then
+		return
+	end
+
+	vim.keymap.set(mode, lhs, rhs, {
+		buffer = bufnr,
+		desc = mapping.desc,
+		expr = mapping.expr == 1,
+		noremap = mapping.noremap == 1,
+		nowait = mapping.nowait == 1,
+		script = mapping.script == 1,
+		silent = mapping.silent == 1,
+	})
+end
 
 local function suppress_hunk_echo(action)
 	local original_echo = vim.api.nvim_echo
@@ -50,14 +63,22 @@ local function suppress_hunk_echo(action)
 	end
 end
 
-local function clear_buffer_keymaps(bufnr)
-	if not (bufnr and vim.api.nvim_buf_is_valid(bufnr)) then
+local function clear_buffer_keymaps(tabpage, bufnr)
+	local tab_keymaps = overridden_buffer_keymaps[tabpage]
+	local buffer_keymaps = tab_keymaps and tab_keymaps[bufnr] or nil
+	if not buffer_keymaps then
 		return
 	end
 
-	for _, lhs in ipairs(custom_codediff_keymaps) do
-		pcall(vim.keymap.del, "n", lhs, { buffer = bufnr })
-		pcall(vim.keymap.del, "x", lhs, { buffer = bufnr })
+	if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
+		for _, override in pairs(buffer_keymaps) do
+			restore_buffer_keymap(bufnr, override.mode, override.lhs, override.previous)
+		end
+	end
+
+	tab_keymaps[bufnr] = nil
+	if not next(tab_keymaps) then
+		overridden_buffer_keymaps[tabpage] = nil
 	end
 end
 
@@ -113,7 +134,7 @@ local function prune_inactive_buffers(tabpage, get_codediff_lifecycle)
 
 	for bufnr, _ in pairs(tracked_buffers) do
 		if not active_buffers[bufnr] then
-			clear_buffer_keymaps(bufnr)
+			clear_buffer_keymaps(tabpage, bufnr)
 			tracked_buffers[bufnr] = nil
 		end
 	end
@@ -131,7 +152,7 @@ local function wrap_tab_action(tabpage, get_codediff_lifecycle, action)
 		local active_buffers = session and collect_active_buffers(lifecycle, tabpage) or {}
 
 		if not active_buffers[current_buf] then
-			clear_buffer_keymaps(current_buf)
+			clear_buffer_keymaps(tabpage, current_buf)
 			return
 		end
 
@@ -220,14 +241,32 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 		return
 	end
 
-	local function set_buffer_keymap(bufnr, lhs, rhs, desc)
+	local function set_owned_buffer_keymap(bufnr, mode, lhs, rhs, desc)
 		if not (bufnr and vim.api.nvim_buf_is_valid(bufnr)) then
 			return
 		end
 
 		remember_buffer(tabpage, session, bufnr)
 
-		vim.keymap.set("n", lhs, wrap_tab_action(tabpage, get_codediff_lifecycle, rhs), {
+		overridden_buffer_keymaps[tabpage] = overridden_buffer_keymaps[tabpage] or {}
+		local buffer_keymaps = overridden_buffer_keymaps[tabpage][bufnr] or {}
+		overridden_buffer_keymaps[tabpage][bufnr] = buffer_keymaps
+		local key = mode .. "\0" .. lhs
+		local override = buffer_keymaps[key]
+		local current = get_buffer_keymap(bufnr, mode, lhs)
+		if not override then
+			override = {
+				mode = mode,
+				lhs = lhs,
+				previous = current,
+			}
+			buffer_keymaps[key] = override
+		elseif not current or current.desc ~= override.desc then
+			override.previous = current
+		end
+
+		override.desc = desc
+		vim.keymap.set(mode, lhs, wrap_tab_action(tabpage, get_codediff_lifecycle, rhs), {
 			buffer = bufnr,
 			noremap = true,
 			silent = true,
@@ -236,20 +275,18 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 		})
 	end
 
+	local function set_buffer_keymap(bufnr, lhs, rhs, desc)
+		set_owned_buffer_keymap(bufnr, "n", lhs, rhs, desc)
+	end
+
 	local function set_visual_buffer_keymap(bufnr, lhs, rhs, desc)
-		if not (bufnr and vim.api.nvim_buf_is_valid(bufnr)) then
-			return
+		set_owned_buffer_keymap(bufnr, "x", lhs, rhs, desc)
+	end
+
+	local function set_tab_keymap(lhs, rhs, desc)
+		for bufnr, _ in pairs(collect_active_buffers(lifecycle, tabpage)) do
+			set_buffer_keymap(bufnr, lhs, rhs, desc)
 		end
-
-		remember_buffer(tabpage, session, bufnr)
-
-		vim.keymap.set("x", lhs, wrap_tab_action(tabpage, get_codediff_lifecycle, rhs), {
-			buffer = bufnr,
-			noremap = true,
-			silent = true,
-			nowait = true,
-			desc = desc,
-		})
 	end
 
 	for bufnr, _ in pairs(collect_active_buffers(lifecycle, tabpage)) do
@@ -257,66 +294,30 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 	end
 
 	if session.mode == "explorer" then
-		lifecycle.set_tab_keymap(
-			tabpage,
-			"n",
-			"ff",
-			wrap_tab_action(tabpage, get_codediff_lifecycle, function()
-				deps.actions.open_file_picker(get_codediff_lifecycle, tabpage)
-			end),
-			{ desc = "Search files in codediff" }
-		)
+		set_tab_keymap("ff", function()
+			deps.actions.open_file_picker(get_codediff_lifecycle, tabpage)
+		end, "Search files in codediff")
 
-		lifecycle.set_tab_keymap(
-			tabpage,
-			"n",
-			"<leader>e",
-			wrap_tab_action(tabpage, get_codediff_lifecycle, function()
-				deps.view.toggle_explorer(get_codediff_lifecycle, tabpage)
-			end),
-			{ desc = "Toggle codediff explorer" }
-		)
+		set_tab_keymap("<leader>e", function()
+			deps.view.toggle_explorer(get_codediff_lifecycle, tabpage)
+		end, "Toggle codediff explorer")
 	end
 
-	lifecycle.set_tab_keymap(
-		tabpage,
-		"n",
-		"<C-q>",
-		wrap_tab_action(tabpage, get_codediff_lifecycle, function()
-			deps.view.close_view(get_codediff_lifecycle)
-		end),
-		{ desc = "Close codediff view" }
-	)
+	set_tab_keymap("<C-q>", function()
+		deps.view.close_view(get_codediff_lifecycle)
+	end, "Close codediff view")
 
-	lifecycle.set_tab_keymap(
-		tabpage,
-		"n",
-		"q",
-		wrap_tab_action(tabpage, get_codediff_lifecycle, function()
-			deps.view.close_view(get_codediff_lifecycle)
-		end),
-		{ desc = "Close codediff view" }
-	)
+	set_tab_keymap("q", function()
+		deps.view.close_view(get_codediff_lifecycle)
+	end, "Close codediff view")
 
-	lifecycle.set_tab_keymap(
-		tabpage,
-		"n",
-		"<leader>gZ",
-		wrap_tab_action(tabpage, get_codediff_lifecycle, function()
-			deps.view.toggle_result_zoom(get_codediff_lifecycle, tabpage)
-		end),
-		{ desc = "Toggle merge result zoom" }
-	)
+	set_tab_keymap("<leader>gZ", function()
+		deps.view.toggle_result_zoom(get_codediff_lifecycle, tabpage)
+	end, "Toggle merge result zoom")
 
-	lifecycle.set_tab_keymap(
-		tabpage,
-		"n",
-		"<leader>gc",
-		wrap_tab_action(tabpage, get_codediff_lifecycle, function()
-			deps.actions.commit_staged(get_codediff_lifecycle, tabpage)
-		end),
-		{ desc = "Commit staged changes" }
-	)
+	set_tab_keymap("<leader>gc", function()
+		deps.actions.commit_staged(get_codediff_lifecycle, tabpage)
+	end, "Commit staged changes")
 
 	local original_bufnr, modified_bufnr = lifecycle.get_buffers(tabpage)
 	if session.mode == "explorer" then
@@ -490,7 +491,7 @@ function M.clear_tab_keymaps(tabpage, get_codediff_lifecycle)
 	end
 
 	for bufnr, _ in pairs(buffers_to_clear) do
-		clear_buffer_keymaps(bufnr)
+		clear_buffer_keymaps(tabpage, bufnr)
 	end
 
 	tracked_keymap_buffers[tabpage] = nil
