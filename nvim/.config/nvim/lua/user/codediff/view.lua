@@ -87,7 +87,15 @@ local function reset_one_sided_conflict_view(tabpage)
 	end
 end
 
+local function absolute_path(path)
+	if type(path) == "table" then
+		return path.absolute
+	end
+	return path
+end
+
 local function path_exists(path)
+	path = absolute_path(path)
 	return path and vim.uv.fs_stat(path) ~= nil
 end
 
@@ -453,11 +461,12 @@ function M.open_status_explorer(repo, focus_file, opts, get_codediff_lifecycle)
 		end
 
 		vim.schedule(function()
+			local path = require("codediff.core.path")
 			codediff_view.create({
 				mode = "explorer",
 				git_root = repo,
-				original_path = "",
-				modified_path = "",
+				original = path.empty(),
+				modified = path.empty(),
 				original_revision = nil,
 				modified_revision = nil,
 				explorer_data = {
@@ -582,8 +591,8 @@ function M.open_file_from_diff(get_codediff_lifecycle, tabpage)
 
 	if not target_path then
 		local original_path, modified_path = lifecycle.get_paths(tabpage)
-		local preferred_path = current_buf == modified_bufnr and modified_path or original_path
-		local fallback_path = current_buf == modified_bufnr and original_path or modified_path
+		local preferred_path = absolute_path(current_buf == modified_bufnr and modified_path or original_path)
+		local fallback_path = absolute_path(current_buf == modified_bufnr and original_path or modified_path)
 
 		if path_exists(preferred_path) then
 			target_path = preferred_path

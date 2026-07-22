@@ -7,6 +7,10 @@ local review = require("user.codediff.review")
 local view = require("user.codediff.view")
 
 local function normalize_repo_relative_path(git_root, path)
+	if type(path) == "table" then
+		path = path.relative ~= "" and path.relative or path.absolute
+	end
+
 	if not git_root or not path or path == "" then
 		return nil
 	end
