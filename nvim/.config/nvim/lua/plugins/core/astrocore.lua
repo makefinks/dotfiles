@@ -37,6 +37,28 @@ local function get_current_absolute_path()
 	return vim.fn.expand("%:p")
 end
 
+local supported_external_extensions = {
+	avif = true,
+	docx = true,
+	epub = true,
+	gif = true,
+	html = true,
+	htm = true,
+	jpeg = true,
+	jpg = true,
+	mkv = true,
+	mov = true,
+	mp3 = true,
+	mp4 = true,
+	pdf = true,
+	pptx = true,
+	svg = true,
+	wav = true,
+	webm = true,
+	webp = true,
+	xlsx = true,
+}
+
 local function yank_path(path, title)
 	if path == nil or path == "" then
 		return
@@ -47,7 +69,7 @@ local function yank_path(path, title)
 	Snacks.notifier.notify("Copied: " .. path, "info", { title = title })
 end
 
-local function get_file_manager_command()
+local function get_system_opener_command()
 	if vim.fn.has("macunix") == 1 then
 		return "open"
 	end
@@ -68,7 +90,7 @@ local function open_current_folder_in_file_manager()
 
 	local absolute_path = vim.fn.fnamemodify(path, ":p")
 	local dir = vim.fn.isdirectory(absolute_path) == 1 and absolute_path or vim.fn.fnamemodify(absolute_path, ":h")
-	local command = get_file_manager_command()
+	local command = get_system_opener_command()
 	if command == nil then
 		Snacks.notifier.notify("No supported file manager command found", "error", { title = "File Manager" })
 		return
@@ -77,6 +99,37 @@ local function open_current_folder_in_file_manager()
 	local job_id = vim.fn.jobstart({ command, dir }, { detach = true })
 	if job_id <= 0 then
 		Snacks.notifier.notify("Failed to open file manager", "error", { title = "File Manager" })
+	end
+end
+
+local function open_current_file_externally()
+	local path = get_current_absolute_path()
+	if path == nil or path == "" then
+		Snacks.notifier.notify("No file path to open", "warn", { title = "External Viewer" })
+		return
+	end
+
+	local extension = vim.fn.fnamemodify(path, ":e"):lower()
+	if not supported_external_extensions[extension] then
+		Snacks.notifier.notify("This file type is not supported", "warn", { title = "External Viewer" })
+		return
+	end
+
+	local absolute_path = vim.fn.fnamemodify(path, ":p")
+	if vim.fn.filereadable(absolute_path) ~= 1 then
+		Snacks.notifier.notify("File is not readable: " .. absolute_path, "warn", { title = "External Viewer" })
+		return
+	end
+
+	local command = get_system_opener_command()
+	if command == nil then
+		Snacks.notifier.notify("No supported external opener found", "error", { title = "External Viewer" })
+		return
+	end
+
+	local job_id = vim.fn.jobstart({ command, absolute_path }, { detach = true })
+	if job_id <= 0 then
+		Snacks.notifier.notify("Failed to open file externally", "error", { title = "External Viewer" })
 	end
 end
 
@@ -132,6 +185,10 @@ return {
 				["<Leader>fo"] = {
 					open_current_folder_in_file_manager,
 					desc = "Open folder in file manager",
+				},
+				["<Leader>fO"] = {
+					open_current_file_externally,
+					desc = "Open file externally",
 				},
 				["<Leader>fs"] = false,
 				["<Leader>fw"] = false,
