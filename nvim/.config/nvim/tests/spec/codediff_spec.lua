@@ -350,9 +350,7 @@ describe("local CodeDiff workflow", function()
 		assert.are_not.equal("Test LSP definition", vim.fn.maparg("gd", "n", false, true).desc)
 
 		require("user.codediff.view").close_view(h.get_codediff_lifecycle)
-		h.wait_for(function()
-			return h.get_codediff_lifecycle().get_session(tabpage) == nil
-		end, 10000, "CodeDiff did not close")
+		assert.is_nil(h.get_codediff_lifecycle().get_session(tabpage))
 
 		assert.is_true(vim.api.nvim_buf_is_valid(session.modified_bufnr))
 		vim.api.nvim_set_current_buf(file_bufnr)
@@ -1407,9 +1405,8 @@ describe("local CodeDiff workflow", function()
 
 		view.close_all_views(h.get_codediff_lifecycle)
 
-		h.wait_for(function()
-			return lifecycle.get_session(first_tabpage) == nil and lifecycle.get_session(second_tabpage) == nil
-		end, 10000, "close_all_views did not tear down both sessions")
+		assert.is_nil(lifecycle.get_session(first_tabpage))
+		assert.is_nil(lifecycle.get_session(second_tabpage))
 	end)
 
 	it("closes the prior codediff session when opening codediff again", function()

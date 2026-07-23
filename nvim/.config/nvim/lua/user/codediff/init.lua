@@ -208,10 +208,25 @@ function M.setup()
 
 	vim.api.nvim_create_autocmd("BufEnter", {
 		group = codediff_group,
-		callback = function()
+		callback = function(args)
 			local tabpage = vim.api.nvim_get_current_tabpage()
+			local lifecycle = get_codediff_lifecycle()
+			local session = lifecycle.get_session(tabpage)
+			local explorer = lifecycle.get_explorer(tabpage)
+			if not session then
+				return
+			end
+
+			local is_diff_buffer = args.buf == session.original_bufnr
+				or args.buf == session.modified_bufnr
+				or args.buf == session.result_bufnr
+			local is_explorer_buffer = explorer and args.buf == explorer.bufnr
+			if not is_diff_buffer and not is_explorer_buffer then
+				return
+			end
+
 			vim.schedule(function()
-				if vim.api.nvim_tabpage_is_valid(tabpage) then
+				if vim.api.nvim_tabpage_is_valid(tabpage) and lifecycle.get_session(tabpage) then
 					modules.view.ensure_explorer_window_state(get_codediff_lifecycle, tabpage)
 					modules.keymaps.set_tab_keymaps(tabpage, get_codediff_lifecycle, keymap_deps)
 				end

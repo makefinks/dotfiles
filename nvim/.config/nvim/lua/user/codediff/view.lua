@@ -511,7 +511,7 @@ function M.close_view(get_codediff_lifecycle)
 	if #vim.api.nvim_list_tabpages() == 1 then
 		local tabnr = vim.api.nvim_tabpage_get_number(tabpage)
 		vim.cmd("tabnew")
-		lifecycle.cleanup_for_quit(tabpage)
+		lifecycle.cleanup(tabpage)
 		if vim.api.nvim_tabpage_is_valid(tabpage) then
 			vim.cmd(tabnr .. "tabclose")
 		end
@@ -519,6 +519,7 @@ function M.close_view(get_codediff_lifecycle)
 	end
 
 	vim.cmd("tabclose")
+	lifecycle.cleanup(tabpage)
 	return true
 end
 
@@ -554,7 +555,10 @@ function M.close_all_views(get_codediff_lifecycle)
 
 	for _, tabpage in ipairs(active_tabpages) do
 		if vim.api.nvim_tabpage_is_valid(tabpage) then
-			pcall(vim.cmd, vim.api.nvim_tabpage_get_number(tabpage) .. "tabclose")
+			local ok = pcall(vim.cmd, vim.api.nvim_tabpage_get_number(tabpage) .. "tabclose")
+			if ok then
+				lifecycle.cleanup(tabpage)
+			end
 		end
 	end
 end

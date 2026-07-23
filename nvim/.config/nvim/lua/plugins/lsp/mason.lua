@@ -14,7 +14,7 @@ return {
 				-- LSP servers
 				"lua-language-server",
 				--"basedpyright"
-				"ty",
+				{ "ty", auto_update = true },
 				"bash-language-server",
 				"json-lsp",
 				"yaml-language-server",
