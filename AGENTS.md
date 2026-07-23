@@ -1,151 +1,143 @@
 # AGENTS.md
+
 ## Scope
-- This is a personal dotfiles repo.
-- The main programmable code lives in `nvim/.config/nvim`.
-- `setup.sh` is the root bootstrap script.
-- `zsh/`, `tmux/`, and `ghostty/` are mostly configuration, not application code.
+
+- This is a personal dotfiles repository.
+- The main application code is the Neovim configuration under `nvim/.config/nvim`.
+- `scripts/check.sh` is the repository validation entrypoint.
+- `setup.sh` installs dependencies and stows the `zsh`, `nvim`, `tmux`, and `ghostty` packages.
+- `vimium-c/` contains browser configuration and is not managed by `setup.sh`.
 
 ## Repository Layout
-- `README.md`: root install overview.
-- `setup.sh`: installs dependencies and stows configs.
+
+- `README.md`: root installation overview.
+- `setup.sh`: Bash bootstrap script for dependencies, Oh My Zsh, Powerlevel10k, backups, and Stow links.
+- `scripts/check.sh`: formats and validates shell/Lua code, then runs the Neovim spec suite.
 - `nvim/.config/nvim/init.lua`: Neovim entrypoint.
-- `nvim/.config/nvim/lua/`: Lua modules and plugin specs.
-- `nvim/.config/nvim/tests/`: Plenary-based tests.
-- `nvim/.config/nvim/selene.toml`: Lua lint config.
-- `nvim/.config/nvim/neovim.yml`: tooling metadata (`lua51`).
+- `nvim/.config/nvim/lua/`: Lua modules and Lazy plugin specifications.
+- `nvim/.config/nvim/lua/plugins/`: plugin specs grouped by feature area.
+- `nvim/.config/nvim/lua/user/`: user-owned integration modules, including CodeDiff.
+- `nvim/.config/nvim/tests/spec/`: Plenary/Busted unit and integration specs.
+- `nvim/.config/nvim/tests/smoke/`: headless startup and end-to-end smoke test runner.
+- `nvim/.config/nvim/tests/fixtures/`: files and projects used by tests.
+- `nvim/.config/nvim/tests/minimal_init.lua`: isolated init used by the spec suite.
+- `nvim/.config/nvim/tests/smoke/init.lua`: full-config init used by smoke tests.
+- `nvim/.config/nvim/selene.toml`: Selene configuration.
+- `nvim/.config/nvim/neovim.yml`: Lua tooling metadata and declared globals.
 
 ## Working Directories
-- Run root/bootstrap commands from `/Users/leon/dotfiles`.
-- Run Neovim dev, lint, and test commands from `/Users/leon/dotfiles/nvim/.config/nvim`.
-- Most code changes will be under `nvim/.config/nvim/lua/`.
 
-## Build And Bootstrap Commands
-- Root setup: `./setup.sh`
-- Sync/install Neovim plugins: `nvim --headless "+Lazy! sync" +qa`
-- Optional dependency health check: `nvim --headless "+checkhealth" +qa`
-- There is no Makefile, `package.json`, or general root build pipeline.
+- Run bootstrap and repository-wide validation commands from the repository root.
+- Run Neovim-specific commands from `nvim/.config/nvim` unless a command is shown with a root-relative path.
+- Most Lua changes belong under `nvim/.config/nvim/lua/`.
 
-## Test Commands
-- Full Neovim suite: `./tests/run.sh`
-- Verified single spec file: `nvim --headless --noplugin -u tests/minimal_init.lua -c "lua require('plenary.busted').run('tests/spec/codediff_spec.lua')" -c "qall!"`
-- Generic single spec file: `nvim --headless --noplugin -u tests/minimal_init.lua -c "lua require('plenary.busted').run('tests/spec/<name>_spec.lua')" -c "qall!"`
+## Bootstrap And Plugin Commands
 
-## Test Notes
-- `tests/run.sh` changes into the Neovim config directory before running tests.
-- Tests use `tests/minimal_init.lua`.
-- The harness expects `plenary.nvim` and `codediff.nvim` in Neovim's lazy plugin directory.
-- Specs use Plenary's Busted-style `describe` / `it` API.
-- Shared helpers belong in `tests/helpers/`.
-- Current tests mainly cover the custom CodeDiff integration.
+- Install or update the dotfiles: `./setup.sh`
+- Install/sync Neovim plugins: `nvim --headless "+Lazy! sync" +qa`
+- Run Neovim health checks: `nvim --headless "+checkhealth" +qa`
+- The Neovim config targets Neovim `>= 0.12.0` and AstroNvim v6.
+- There is no Makefile, package manifest, or general application build pipeline.
 
-## Lint And Format Commands
+## Validation Commands
+
+From the repository root:
+
+- Full repository check: `./scripts/check.sh`
+- Format shell scripts: `shfmt -w setup.sh scripts/check.sh`
+- Lint shell scripts: `shellcheck setup.sh scripts/check.sh`
+
+From `nvim/.config/nvim`:
+
 - Format Lua: `stylua .`
 - Lint Lua: `selene .`
-- Format the bootstrap script: `shfmt -w setup.sh`
-- Lint the bootstrap script: `shellcheck setup.sh`
+- Run the Plenary spec suite: `./tests/run.sh`
+- Run the full-config smoke suite: `./tests/smoke/run.sh`
+- Run one spec: `nvim --headless --noplugin -u tests/minimal_init.lua -c "lua require('plenary.busted').run('tests/spec/<name>_spec.lua')" -c "qall!"`
 
-## Command Strategy For Agents
-- Run `stylua` on edited Lua files before finishing.
-- Run `selene .` after non-trivial Lua changes.
-- Run `./tests/run.sh` when changing behavior under `lua/plugins/git/codediff*` or `tests/helpers/`.
-- If a change is narrowly scoped to one spec or one CodeDiff behavior, run the focused single-spec command first.
-- If a command cannot run because a dependency is missing, say so explicitly.
+`scripts/check.sh` formats `setup.sh`, `scripts/check.sh`, and the entire Neovim config before running ShellCheck, Selene, and `tests/run.sh`. The smoke suite is separate and is not included in that script.
+
+## Test Notes
+
+- `tests/run.sh` changes into the Neovim config directory and runs `PlenaryBustedDirectory` over `tests/spec/`.
+- The spec harness requires `plenary.nvim` and `codediff.nvim` under Neovim's lazy data directory, normally `stdpath('data') .. '/lazy'`.
+- Specs use Plenary's Busted-style `describe`, `it`, `before_each`, and `after_each` API.
+- Smoke tests load the full config and exercise startup, fixture opening, Snacks/fff pickers and grep, and the `ty` Python LSP.
+- Smoke tests therefore require the configured plugins and the Mason `ty` binary in addition to the spec dependencies.
+- Use explicit wait helpers for asynchronous UI behavior and clean up temporary repositories/editor state in teardown paths.
+- Shared test support belongs in `tests/helpers/`; test-only fixtures belong in `tests/fixtures/`.
 
 ## Runtime Assumptions
-- Lua code targets Neovim's embedded Lua runtime.
-- Tooling metadata declares `lua51` in `neovim.yml`.
-- Selene uses `std = "neovim"`.
-- Production modules assume Neovim globals like `vim`, `vim.api`, and `vim.fn` exist.
+
+- Lua targets Neovim's embedded Lua 5.1 runtime.
+- Production modules assume Neovim globals such as `vim`, `vim.api`, and `vim.fn` exist.
+- `selene.toml` uses the `neovim` standard library.
+- `init.lua` can clone `lazy.nvim` into Neovim's data directory when it is absent.
 
 ## Code Organization
-- Most Lua files follow one of two patterns:
-  - plugin spec files that `return { ... }`
-  - module files that start with `local M = {}` and end with `return M`
-- Put `require` statements near the top.
-- Keep private helper functions above exported functions when practical.
+
+- Plugin spec files return Lazy spec tables.
+- Module files generally start with `local M = {}` and end with `return M`.
+- Keep private helpers above exported functions when practical.
 - Prefer small helpers over deeply nested inline logic.
 - Keep plugin-specific helpers next to the plugin they support.
 - Put test-only support code in `tests/helpers/`, not production modules.
 
 ## Imports And Requires
-- Existing code often uses `require "module.path"` for simple string-literal imports.
-- `require("module.path")` is also used when immediately indexing or when clearer in context.
-- Match the style already used in the file you are editing.
-- Group local module requires together near the top of the file.
+
+- Match the file's existing style: both `require "module.path"` and `require("module.path")` are used.
+- Group local module requires near the top of the file.
 - Avoid dynamic requires unless they help with optional dependencies or startup cost.
 - Use `pcall(require, ...)` when a dependency may be absent at runtime.
 
-## Formatting
-- `stylua` is the source of truth for Lua formatting.
-- Do not hand-align whitespace for aesthetics.
-- Some files still contain legacy tab-indented blocks; prefer normalized formatter output over preserving manual spacing.
-- Keep blank lines between logical sections, not between every statement.
-- Do not add semicolons.
-- Expand tables when options become multi-line or hard to scan.
-- Respect `-- stylua: ignore` only where layout is intentionally hand-crafted.
+## Formatting And Naming
 
-## Naming
-- Use `snake_case` for file names, locals, and function names.
-- Use descriptive helper names such as `find_status_entry`, `refresh_hidden_explorer`, or `capture_echoes`.
-- Prefix booleans and predicates with `is_`, `has_`, `can_`, or `ok_` when it helps clarity.
-- Reserve ALL_CAPS for genuine constants only.
-- Plugin spec tables usually keep descriptive keys rather than temporary aliases.
+- `stylua` is the source of truth for Lua formatting; do not hand-align whitespace.
+- Keep blank lines between logical sections and do not add semicolons.
+- Respect `-- stylua: ignore` only for intentionally hand-crafted layouts.
+- Use `snake_case` for file names, locals, and functions.
+- Prefix predicates with `is_`, `has_`, `can_`, or `ok_` when it improves clarity.
+- Reserve ALL_CAPS for genuine constants.
+- Add EmmyLua annotations when they materially improve editor support, especially for plugin specs and tricky state tables.
 
-## Types And Annotations
-- Use EmmyLua annotations where they materially help editor support.
-- Existing code uses `---@type LazySpec`, `---@type AstroLSPOpts`, and targeted `---@diagnostic` comments.
-- Add annotations for plugin spec returns and tricky option/state tables.
-- Do not over-annotate obvious locals.
-- Prefer clear table structure and naming before reaching for comments.
+## Error Handling And Neovim Patterns
 
-## Error Handling
-- Prefer early-return guard clauses.
+- Prefer guard clauses and graceful handling for recoverable failures.
 - Use `pcall` for optional plugin modules and unstable integrations.
 - Use `vim.notify(..., vim.log.levels.ERROR/WARN)` for user-visible runtime failures.
-- In async callbacks, wrap UI-facing work in `vim.schedule` when needed.
-- Use `assert(...)` freely in tests and test helpers.
-- In production code, reserve hard assertions for true invariants; prefer graceful notifications for recoverable problems.
-
-## Neovim-Specific Patterns
+- Wrap UI-facing work in `vim.schedule` when running from asynchronous callbacks.
+- Use `assert(...)` freely in tests; reserve hard assertions in production for true invariants.
 - Use `vim.api.nvim_create_autocmd` and `vim.api.nvim_create_augroup` for autocommands.
 - Use `vim.keymap.set` for mappings.
-- Prefer buffer- or tab-scoped behavior when integrating with plugin UIs.
+- Prefer buffer- or tab-scoped behavior for plugin UIs.
 - Validate windows, buffers, and tabpages before using them.
-- Use `vim.deepcopy` when copying state that should not be mutated in place.
-- Use `vim.tbl_extend("force", ...)` for merged option or state tables.
+- Use `vim.deepcopy` for state that should not be mutated in place and `vim.tbl_extend("force", ...)` for merged options.
 
-## Plugin Configuration Style
-- AstroNvim/Lazy plugin specs are returned directly as Lua tables.
+## Plugin Configuration
+
+- AstroNvim/Lazy plugin specs are returned directly as tables.
 - Keep `opts`, `config`, `keys`, `cmd`, and `event` sections easy to scan.
 - Preserve existing `desc` strings unless behavior changes.
-- If you disable inherited mappings, follow the existing pattern of setting that entry to `false`.
-- Move custom behavior into local helper modules when a setup table becomes too large.
+- Disable inherited mappings by setting the relevant entry to `false`, following nearby examples.
+- Move custom behavior into a local helper module when a setup table becomes too large.
+- For CodeDiff changes, inspect neighboring modules under `lua/user/codediff/` and the spec/helper files before changing behavior.
+- For LSP or formatter changes, inspect both `lua/plugins/lsp/` and the Mason/Conform settings.
 
-## Testing Style
-- Use Busted-style `describe`, `it`, `before_each`, and `after_each` blocks.
-- Prefer helper-driven setup over repeated temp repo/editor boilerplate.
-- Use explicit wait helpers for async UI behavior.
-- Keep test names behavior-oriented and specific.
-- Clean up temporary repos and editor state in teardown paths.
+## Shell Scripts
 
-## Shell Script Style
-- `setup.sh` is Bash, not POSIX `sh`.
-- Keep `set -euo pipefail` at the top of Bash scripts.
-- Use uppercase names for global script variables.
-- Use `snake_case` for shell function names.
+- `setup.sh` and `scripts/check.sh` are Bash scripts; test scripts under `nvim/.config/nvim/tests/` are POSIX `sh`.
+- Bash scripts use `set -euo pipefail` near the top.
+- Use uppercase names for global Bash variables and `snake_case` for shell functions.
 - Quote variable expansions unless unquoted behavior is intentional.
 - Prefer `[[ ... ]]` in Bash conditionals.
 
-## Practical Editing Advice
-- Preserve the existing architecture; this repo is highly personalized and plugin-specific.
-- Avoid broad refactors unless they clearly simplify a localized area.
-- Do not remove Unicode artwork or decorative UI content unless the task requires it.
-- For CodeDiff work, read neighboring files under `lua/plugins/git/codediff/` before changing behavior.
-- For LSP or formatter changes, inspect both `lua/plugins/lsp/` and Mason/conform settings together.
-- When adding tests, use the existing Plenary harness rather than inventing a new runner.
+## Editing And Verification Strategy
 
-## Minimal Validation Checklist
-- Format changed Lua with `stylua`.
-- Lint Lua with `selene .` when feasible.
-- Run the focused spec command for localized test work.
-- Run `./tests/run.sh` for broader CodeDiff behavior changes.
+- Preserve the existing personalized architecture and avoid broad refactors.
+- Do not remove Unicode artwork or decorative UI content unless required.
+- Run `stylua` on edited Lua files before finishing.
+- Run `selene .` after non-trivial Lua changes.
+- Run `./tests/run.sh` for changes affecting tested Neovim behavior.
+- Run `./tests/smoke/run.sh` when changing startup, plugin loading, pickers, LSP setup, or other full-config behavior.
+- Run `./scripts/check.sh` for repository-wide changes when its required tools are available.
+- If a command cannot run because a dependency is missing, report the dependency explicitly.
