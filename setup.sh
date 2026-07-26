@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PKGS=("nvim" "tmux" "ghostty" "zsh")
+PKGS=("nvim" "tmux" "ghostty" "zsh" "pi")
 MANAGED_PATHS=(
 	".config/ghostty"
 	".config/nvim"
 	".config/zsh"
+	".pi/settings.json"
+	".pi/agent/settings.json"
+	".pi/agent/themes/charcoal.json"
+	".pi/agent/keybindings.json"
+	".pi/agent/extensions/file-picker.ts"
+	".pi/agent/extensions/leader-hotkeys.ts"
+	".pi/agent/extensions/read-preview.ts"
+	".pi/agent/extensions/working-animations.ts"
 	".tmux.conf"
 	".zshrc.oh-my-zsh"
 )
@@ -56,6 +64,27 @@ ensure_zshrc_sources_dotfiles() {
 	if ! grep -Fqx "$source_line" "$ZSH_RC"; then
 		printf '\n%s\n' "$source_line" >>"$ZSH_RC"
 	fi
+}
+
+install_pi_packages() {
+	if ! command -v pi >/dev/null 2>&1; then
+		echo "Pi is not installed; skipping configured Pi packages."
+		return
+	fi
+
+	local settings_file="$DOTFILES_DIR/pi/.pi/agent/settings.json"
+	while IFS= read -r package; do
+		[[ -n "$package" ]] || continue
+		echo "Installing Pi package $package..."
+		pi install "$package"
+	done < <(node -e '
+const fs = require("fs");
+const settings = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+for (const package of settings.packages ?? []) {
+	const source = typeof package === "string" ? package : package?.source;
+	if (typeof source === "string") console.log(source);
+}
+' "$settings_file")
 }
 
 # Install dependencies
@@ -118,6 +147,9 @@ echo "Installing Oh My Zsh and Powerlevel10k..."
 clone_or_update_repo "Oh My Zsh" "https://github.com/ohmyzsh/ohmyzsh.git" "$OH_MY_ZSH_DIR"
 clone_or_update_repo "Powerlevel10k" "https://github.com/romkatv/powerlevel10k.git" "$POWERLEVEL10K_DIR"
 
+# Keep Pi's generated auth, sessions, and package files outside the Stow package.
+mkdir -p "$TARGET/.pi/agent/extensions" "$TARGET/.pi/agent/themes"
+
 # Back up only the application configs owned by this repository. Walking each
 # Stow package also visits .config itself, which would move the entire directory.
 mkdir -p "$BACKUP"
@@ -132,6 +164,7 @@ done
 # Create (or refresh) symlinks
 stow -v -R --dir="$DOTFILES_DIR" --target="$TARGET" "${PKGS[@]}"
 
+install_pi_packages
 ensure_zshrc_sources_dotfiles
 
 echo "Done. Backups (if any): $BACKUP"

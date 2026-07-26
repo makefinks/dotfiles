@@ -26,6 +26,10 @@ custom-shader = shaders/blaze.glsl
 custom-shader = shaders/cursor_warp.glsl
 custom-shader = shaders/ripple_rectangle_cursor.glsl
 
+# Scroll terminal history with Ctrl+Option+U/D.
+keybind = ctrl+alt+u=scroll_page_lines:-5
+keybind = ctrl+alt+d=scroll_page_lines:5
+
 # tmux-like leader tab switching (Ctrl+b, then index)
 keybind = ctrl+n=unbind
 keybind = ctrl+shift+n=unbind

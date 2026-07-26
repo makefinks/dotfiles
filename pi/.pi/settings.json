@@ -1,0 +1,11 @@
+{
+  "diffTheme": "midnight",
+  "diffColors": {
+    "bgAdd": "#1E3A5F",
+    "bgDel": "#4A2230",
+    "bgAddHighlight": "#2B5B88",
+    "bgDelHighlight": "#633838",
+    "fgAdd": "#7DCFFF",
+    "fgDel": "#F7768E"
+  }
+}

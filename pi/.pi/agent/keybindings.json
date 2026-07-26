@@ -1,0 +1,13 @@
+{
+  "tui.select.up": ["up", "ctrl+p"],
+  "tui.select.down": ["down", "ctrl+n"],
+  "app.model.cycleForward": [],
+  "app.message.copy": [],
+  "app.session.resume": ["ctrl+q"],
+  "app.session.toggleNamedFilter": ["alt+n"],
+  "app.session.togglePath": ["alt+p"],
+  "app.model.select": ["f12"],
+  "app.thinking.cycle": ["shift+tab", "ctrl+t"],
+  "app.thinking.toggle": ["ctrl+r"],
+  "app.session.rename": []
+}
