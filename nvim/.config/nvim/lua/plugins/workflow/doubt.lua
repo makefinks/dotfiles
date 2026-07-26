@@ -1,5 +1,5 @@
 return {
-	dir = "/Users/leon/doubt.nvim",
+	"makefinks/doubt.nvim",
 	dependencies = { "MunifTanjim/nui.nvim" },
 	config = function()
 		require("doubt").setup()
