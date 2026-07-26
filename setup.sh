@@ -13,6 +13,7 @@ MANAGED_PATHS=(
 	".pi/agent/extensions/file-picker.ts"
 	".pi/agent/extensions/leader-hotkeys.ts"
 	".pi/agent/extensions/read-preview.ts"
+	".pi/agent/extensions/reasoning-animation.ts"
 	".pi/agent/extensions/working-animations.ts"
 	".tmux.conf"
 	".zshrc.oh-my-zsh"
