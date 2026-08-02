@@ -1,3 +1,30 @@
+local never_show = {
+	"node_modules",
+	".venv",
+	"venv",
+	"__pycache__",
+	".pytest_cache",
+	"dist",
+	"build",
+	".next",
+	".nuxt",
+	"target",
+	"cdk.out",
+}
+
+local function exclude_never_show(cmd, _, _, args)
+	if cmd ~= "fd" and cmd ~= "fdfind" then
+		return args
+	end
+
+	for _, name in ipairs(never_show) do
+		args[#args + 1] = "--exclude"
+		args[#args + 1] = name
+	end
+
+	return args
+end
+
 return {
 	"nvim-neo-tree/neo-tree.nvim",
 	opts = {
@@ -12,6 +39,11 @@ return {
 			},
 		},
 		filesystem = {
+			window = {
+				mappings = {
+					["/"] = "fuzzy_finder",
+				},
+			},
 			commands = {
 				find_files_in_dir = function()
 					local ok_lazy, lazy = pcall(require, "lazy")
@@ -32,23 +64,13 @@ return {
 					end
 				end,
 			},
+			find_args = exclude_never_show,
 			filtered_items = {
 				visible = false,
 				hide_dotfiles = false,
 				hide_gitignored = false,
 				hide_hidden = true,
-				never_show = {
-					"node_modules",
-					".venv",
-					"venv",
-					"__pycache__",
-					".pytest_cache",
-					"dist",
-					"build",
-					".next",
-					".nuxt",
-					"target",
-				},
+				never_show = never_show,
 			},
 			follow_current_file = {
 				enabled = true,
