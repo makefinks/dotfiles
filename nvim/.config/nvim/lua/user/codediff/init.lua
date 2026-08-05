@@ -246,6 +246,11 @@ function M.setup()
 	})
 
 	require("codediff").setup({
+		highlights = {
+			-- Preserve the colorscheme's red/blue diff palette, but make changed
+			-- words brighter than the surrounding line-level diff tint.
+			char_brightness = 1.8,
+		},
 		diff = {
 			layout = "side-by-side",
 			cycle_next_hunk = false,
