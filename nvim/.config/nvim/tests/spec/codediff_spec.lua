@@ -942,6 +942,45 @@ describe("local CodeDiff workflow", function()
 		assert.is_not_nil(resumed_explorer)
 	end)
 
+	it("resumes in the original pane at the saved diff cursor", function()
+		local view = require("user.codediff.view")
+
+		repo = create_multiline_modified_files_repo()
+		local tabpage, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+
+		h.wait_for(function()
+			local session = h.get_codediff_lifecycle().get_session(tabpage)
+			return explorer.current_file_path == "alpha.lua"
+				and session
+				and session.original_win
+				and vim.api.nvim_win_is_valid(session.original_win)
+				and vim.api.nvim_buf_line_count(session.original_bufnr) >= 2
+		end, 10000, "CodeDiff original buffer was not ready")
+
+		local session = h.get_codediff_lifecycle().get_session(tabpage)
+		vim.api.nvim_set_current_win(session.original_win)
+		vim.api.nvim_win_set_cursor(0, { 2, 2 })
+		view.open_file_from_diff(h.get_codediff_lifecycle, tabpage)
+
+		h.wait_for(function()
+			return vim.api.nvim_buf_get_name(0) == repo.path("alpha.lua")
+		end, 10000, "CodeDiff did not open the working tree file")
+
+		view.resume_last_session(h.get_codediff_lifecycle)
+
+		local _, resumed_session = h.wait_for_explorer_session({
+			file_path = "alpha.lua",
+			group = "unstaged",
+		}, 15000, "CodeDiff did not reopen the saved original pane session")
+
+		h.wait_for(function()
+			return resumed_session.original_win
+				and vim.api.nvim_win_is_valid(resumed_session.original_win)
+				and vim.api.nvim_get_current_win() == resumed_session.original_win
+				and vim.deep_equal(vim.api.nvim_win_get_cursor(resumed_session.original_win), { 2, 2 })
+		end, 15000, "CodeDiff did not restore the saved original pane cursor")
+	end)
+
 	it("resumes the last codediff session after closing the view", function()
 		local view = require("user.codediff.view")
 		local lifecycle = h.get_codediff_lifecycle()

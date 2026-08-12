@@ -55,6 +55,7 @@ local function normalize_snapshot(snapshot)
 		file_path = snapshot.file_path,
 		group = snapshot.group,
 		cursor = normalize_cursor(snapshot.cursor),
+		pane = type(snapshot.pane) == "string" and snapshot.pane or "modified",
 		reviewed = type(snapshot.reviewed) == "table" and snapshot.reviewed or nil,
 		hide_untracked = snapshot.hide_untracked ~= false,
 		explorer_hidden = snapshot.explorer_hidden == true,
@@ -222,7 +223,7 @@ local function find_status_entry(status_result, file_path, preferred_group)
 	return nil
 end
 
-local function capture_resume_snapshot(session, explorer, cursor)
+local function capture_resume_snapshot(session, explorer, cursor, pane)
 	if not session or session.mode ~= "explorer" or not explorer or not explorer.git_root then
 		return
 	end
@@ -238,6 +239,7 @@ local function capture_resume_snapshot(session, explorer, cursor)
 		file_path = file_path,
 		group = group,
 		cursor = vim.deepcopy(cursor),
+		pane = pane,
 		reviewed = vim.deepcopy(explorer._user_reviewed),
 		hide_untracked = session.hide_untracked ~= false,
 		explorer_hidden = explorer.is_hidden or false,
@@ -246,26 +248,33 @@ local function capture_resume_snapshot(session, explorer, cursor)
 	}
 end
 
-local function get_resume_cursor(session)
+local function get_resume_position(session)
 	local current_win = vim.api.nvim_get_current_win()
 	if current_win and vim.api.nvim_win_is_valid(current_win) then
 		local current_buf = vim.api.nvim_win_get_buf(current_win)
-		if
-			current_buf == session.original_bufnr
-			or current_buf == session.modified_bufnr
-			or current_buf == session.result_bufnr
-		then
-			return vim.api.nvim_win_get_cursor(current_win)
+		for pane, bufnr in pairs({
+			original = session.original_bufnr,
+			modified = session.modified_bufnr,
+			result = session.result_bufnr,
+		}) do
+			if current_buf == bufnr then
+				return vim.api.nvim_win_get_cursor(current_win), pane
+			end
 		end
 	end
 
-	for _, winid in ipairs({ session.modified_win, session.original_win, session.result_win }) do
+	for _, item in ipairs({
+		{ session.modified_win, "modified" },
+		{ session.original_win, "original" },
+		{ session.result_win, "result" },
+	}) do
+		local winid, pane = unpack(item)
 		if winid and vim.api.nvim_win_is_valid(winid) then
-			return vim.api.nvim_win_get_cursor(winid)
+			return vim.api.nvim_win_get_cursor(winid), pane
 		end
 	end
 
-	return { 1, 0 }
+	return { 1, 0 }, "modified"
 end
 
 function M.save(get_codediff_lifecycle, tabpage, cursor)
@@ -284,7 +293,8 @@ function M.save(get_codediff_lifecycle, tabpage, cursor)
 		return
 	end
 
-	local snapshot = capture_resume_snapshot(session, explorer, cursor or get_resume_cursor(session))
+	local current_cursor, pane = get_resume_position(session)
+	local snapshot = capture_resume_snapshot(session, explorer, cursor or current_cursor, pane)
 	if not snapshot then
 		return
 	end
@@ -292,6 +302,65 @@ function M.save(get_codediff_lifecycle, tabpage, cursor)
 	last_resume_snapshot = snapshot
 	persist_snapshot(snapshot)
 	session._user_resume_snapshot_saved = true
+end
+
+local function path_matches_snapshot(path, snapshot)
+	if not path then
+		return false
+	end
+
+	if type(path) == "table" then
+		if path.relative == snapshot.file_path then
+			return true
+		end
+		path = path.absolute
+	end
+
+	return type(path) == "string"
+		and vim.fn.fnamemodify(path, ":p") == vim.fn.fnamemodify(snapshot.repo .. "/" .. snapshot.file_path, ":p")
+end
+
+local function restore_cursor_when_ready(get_codediff_lifecycle, tabpage, expected_explorer, snapshot, attempt)
+	attempt = attempt or 1
+	local lifecycle = get_codediff_lifecycle()
+	local session = lifecycle and lifecycle.get_session(tabpage) or nil
+	local explorer = lifecycle and lifecycle.get_explorer(tabpage) or nil
+	if not session or explorer ~= expected_explorer or session.mode ~= "explorer" then
+		return
+	end
+
+	local pane = snapshot.pane or "modified"
+	local winid = session[pane .. "_win"]
+	local bufnr = session[pane .. "_bufnr"]
+	if not winid or not vim.api.nvim_win_is_valid(winid) then
+		winid = session.modified_win or session.original_win
+		bufnr = winid and vim.api.nvim_win_get_buf(winid) or nil
+	end
+
+	local selected_file_ready = explorer.current_file_path == snapshot.file_path
+		and explorer.current_file_group == snapshot.group
+		and (path_matches_snapshot(session.original, snapshot) or path_matches_snapshot(session.modified, snapshot))
+		and winid
+		and vim.api.nvim_win_is_valid(winid)
+		and bufnr
+		and vim.api.nvim_buf_is_valid(bufnr)
+		and vim.api.nvim_win_get_buf(winid) == bufnr
+
+	if not selected_file_ready then
+		if attempt < 200 then
+			vim.defer_fn(function()
+				restore_cursor_when_ready(get_codediff_lifecycle, tabpage, expected_explorer, snapshot, attempt + 1)
+			end, 50)
+		end
+		return
+	end
+
+	vim.api.nvim_set_current_win(winid)
+	pcall(vim.api.nvim_win_set_cursor, winid, clamp_cursor_position(bufnr, snapshot.cursor))
+	vim._with({ win = winid }, function()
+		vim.cmd("normal! zz")
+	end)
+	last_resume_snapshot = snapshot
 end
 
 local function apply_snapshot(get_codediff_lifecycle, snapshot, deps, attempt)
@@ -353,22 +422,11 @@ local function apply_snapshot(get_codediff_lifecycle, snapshot, deps, attempt)
 			deps.toggle_explorer(get_codediff_lifecycle, current_tabpage)
 		end
 
-		if not deps.focus_diff_window(get_codediff_lifecycle, current_tabpage) then
-			return
+		if selection then
+			restore_cursor_when_ready(get_codediff_lifecycle, current_tabpage, current_explorer, snapshot)
+		else
+			deps.focus_diff_window(get_codediff_lifecycle, current_tabpage)
 		end
-
-		local current_win = vim.api.nvim_get_current_win()
-		if not vim.api.nvim_win_is_valid(current_win) then
-			return
-		end
-
-		local current_bufnr = vim.api.nvim_win_get_buf(current_win)
-		if not (current_bufnr and vim.api.nvim_buf_is_valid(current_bufnr)) then
-			return
-		end
-
-		pcall(vim.api.nvim_win_set_cursor, current_win, clamp_cursor_position(current_bufnr, snapshot.cursor))
-		last_resume_snapshot = snapshot
 	end, 80)
 end
 
