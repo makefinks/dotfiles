@@ -49,8 +49,13 @@ keybind = ctrl+b>7=goto_tab:8
 keybind = ctrl+b>8=goto_tab:9
 keybind = ctrl+b>9=goto_tab:10
 
-# Split management for a dedicated Copilot pane.
-keybind = ctrl+b>v=new_split:right
+# Make Omarchy's universal Super+V (sent as Shift+Insert) paste the
+# clipboard, not the primary selection. Ghostty defaults Shift+Insert
+# to paste_from_selection, while Foot/Alacritty/Kitty use the clipboard.
+keybind = shift+insert=paste_from_clipboard
+
+# Smart split: splits along the larger direction to avoid skinny panes.
+keybind = ctrl+b>v=new_split:auto
 
 # Larger-step split resizing using Ghostty's default macOS chords.
 keybind = super+ctrl+arrow_left=resize_split:left,30
