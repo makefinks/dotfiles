@@ -345,6 +345,7 @@ local function restore_cursor_when_ready(get_codediff_lifecycle, tabpage, expect
 		and bufnr
 		and vim.api.nvim_buf_is_valid(bufnr)
 		and vim.api.nvim_win_get_buf(winid) == bufnr
+		and (session.stored_diff_result ~= nil or session.single_pane)
 
 	if not selected_file_ready then
 		if attempt < 200 then
@@ -388,7 +389,11 @@ local function apply_snapshot(get_codediff_lifecycle, snapshot, deps, attempt)
 	local selection = find_status_entry(explorer.status_result, snapshot.file_path, snapshot.group)
 	explorer._user_reviewed = vim.deepcopy(snapshot.reviewed)
 	review.install_renderer(explorer)
-	if selection then
+	-- Opening the explorer already starts loading its initial selection. Reselecting
+	-- it can queue a second render that overwrites the restored cursor and focus.
+	if
+		selection and (explorer.current_file_path ~= selection.path or explorer.current_file_group ~= selection.group)
+	then
 		deps.select_explorer_file(explorer, selection)
 	else
 		review.render(explorer)
@@ -418,14 +423,32 @@ local function apply_snapshot(get_codediff_lifecycle, snapshot, deps, attempt)
 			deps.refresh_statusline(get_codediff_lifecycle, current_tabpage)
 		end
 
-		if snapshot.explorer_hidden and not current_explorer.is_hidden then
-			deps.toggle_explorer(get_codediff_lifecycle, current_tabpage)
+		local function restore_position()
+			if selection then
+				restore_cursor_when_ready(get_codediff_lifecycle, current_tabpage, current_explorer, snapshot)
+			else
+				deps.focus_diff_window(get_codediff_lifecycle, current_tabpage)
+			end
 		end
 
-		if selection then
-			restore_cursor_when_ready(get_codediff_lifecycle, current_tabpage, current_explorer, snapshot)
-		else
-			deps.focus_diff_window(get_codediff_lifecycle, current_tabpage)
+		local hide_explorer = snapshot.explorer_hidden and not current_explorer.is_hidden
+		local wait_for_resize = hide_explorer and #vim.api.nvim_list_uis() > 0
+		if wait_for_resize then
+			-- Sidebar resizing runs CodeDiff's scroll sync after this callback returns.
+			-- Restore only after those handlers finish, or they can move the cursor back.
+			vim.api.nvim_create_autocmd("WinResized", {
+				group = vim.api.nvim_create_augroup("user_codediff_resume_layout", { clear = true }),
+				once = true,
+				callback = function()
+					vim.schedule(restore_position)
+				end,
+			})
+		end
+		if hide_explorer then
+			deps.toggle_explorer(get_codediff_lifecycle, current_tabpage)
+		end
+		if not wait_for_resize then
+			restore_position()
 		end
 	end, 80)
 end

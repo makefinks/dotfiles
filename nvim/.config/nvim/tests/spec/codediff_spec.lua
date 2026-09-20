@@ -6,6 +6,7 @@ local original_notify
 local original_lsp_buf_request_all
 local original_lsp_get_client_by_id
 local original_lsp_get_clients
+local original_resolve_revision
 local repo
 local echo_capture
 
@@ -230,6 +231,11 @@ describe("local CodeDiff workflow", function()
 	end)
 
 	after_each(function()
+		if original_resolve_revision then
+			require("codediff.core.git").resolve_revision = original_resolve_revision
+			original_resolve_revision = nil
+		end
+
 		if original_lsp_buf_request_all then
 			vim.lsp.buf_request_all = original_lsp_buf_request_all
 			original_lsp_buf_request_all = nil
@@ -941,6 +947,56 @@ describe("local CodeDiff workflow", function()
 		assert.is_not_nil(resumed_tabpage)
 		assert.is_not_nil(resumed_explorer)
 	end)
+
+	for _, hidden in ipairs({ false, true }) do
+		it(
+			"keeps the resumed cursor after async rendering with the sidebar " .. (hidden and "hidden" or "visible"),
+			function()
+				repo = create_multiline_modified_files_repo()
+				local tabpage, session = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+				h.wait_for(function()
+					return session.stored_diff_result ~= nil
+						and vim.api.nvim_buf_line_count(session.modified_bufnr) == 5
+				end, 10000, "CodeDiff did not finish loading alpha.lua")
+				h.set_explorer_hidden(tabpage, hidden)
+				h.focus_modified_window(tabpage)
+				vim.api.nvim_win_set_cursor(0, { 5, 2 })
+				vim.fn.maparg("<CR>", "n", false, true).callback()
+				h.wait_for(function()
+					return vim.api.nvim_buf_get_name(0) == repo.path("alpha.lua")
+				end, 10000, "CodeDiff did not open the working tree file")
+				assert.same({ 5, 2 }, vim.api.nvim_win_get_cursor(0))
+
+				-- Keep the initial selection pending beyond resume's snapshot timer.
+				local git = require("codediff.core.git")
+				original_resolve_revision = git.resolve_revision
+				git.resolve_revision = function(revision, git_root, callback)
+					original_resolve_revision(revision, git_root, function(err, resolved)
+						vim.defer_fn(function()
+							callback(err, resolved)
+						end, 350)
+					end)
+				end
+				require("user.codediff").resume_last_session()
+				local _, resumed_session, resumed_explorer = h.wait_for_explorer_session({
+					file_path = "alpha.lua",
+					group = "unstaged",
+				})
+				local function cursor_restored()
+					return vim.api.nvim_get_current_win() == resumed_session.modified_win
+						and vim.deep_equal(vim.api.nvim_win_get_cursor(resumed_session.modified_win), { 5, 2 })
+				end
+				h.wait_for(cursor_restored, 10000, "CodeDiff did not restore the saved diff cursor")
+
+				-- A transient success must not hide a later render stealing the cursor.
+				local cursor_moved = vim.wait(600, function()
+					return not cursor_restored()
+				end, 10)
+				assert.is_false(cursor_moved)
+				assert.equals(hidden, resumed_explorer.is_hidden == true)
+			end
+		)
+	end
 
 	it("resumes in the original pane at the saved diff cursor", function()
 		local view = require("user.codediff.view")
