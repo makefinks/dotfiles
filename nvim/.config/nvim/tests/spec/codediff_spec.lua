@@ -977,6 +977,13 @@ describe("local CodeDiff workflow", function()
 						end, 350)
 					end)
 				end
+				local view = require("user.codediff.view")
+				local toggle_calls = 0
+				local original_toggle = view.toggle_explorer
+				view.toggle_explorer = function(...)
+					toggle_calls = toggle_calls + 1
+					return original_toggle(...)
+				end
 				require("user.codediff").resume_last_session()
 				local _, resumed_session, resumed_explorer = h.wait_for_explorer_session({
 					file_path = "alpha.lua",
@@ -992,8 +999,12 @@ describe("local CodeDiff workflow", function()
 				local cursor_moved = vim.wait(600, function()
 					return not cursor_restored()
 				end, 10)
+				view.toggle_explorer = original_toggle
 				assert.is_false(cursor_moved)
 				assert.equals(hidden, resumed_explorer.is_hidden == true)
+				if hidden then
+					assert.equals(0, toggle_calls)
+				end
 			end
 		)
 	end

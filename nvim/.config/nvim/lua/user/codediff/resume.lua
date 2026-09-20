@@ -140,6 +140,55 @@ local function with_cwd(path, callback)
 	return true
 end
 
+local function with_initial_explorer_hidden(hidden, fn)
+	if not hidden then
+		return fn()
+	end
+
+	local has_config, config = pcall(require, "codediff.config")
+	if
+		not has_config
+		or type(config) ~= "table"
+		or type(config.options) ~= "table"
+		or type(config.options.explorer) ~= "table"
+	then
+		return fn()
+	end
+
+	-- Upstream honors explorer.hidden at creation time and hides the split before
+	-- first paint, so resume can start hidden instead of flashing then toggling.
+	local original = config.options.explorer.hidden
+	config.options.explorer.hidden = true
+	local restored = false
+	local function restore()
+		if restored then
+			return
+		end
+
+		restored = true
+		config.options.explorer.hidden = original
+	end
+
+	local group = vim.api.nvim_create_augroup("user_codediff_resume_hidden", { clear = true })
+	vim.api.nvim_create_autocmd("User", {
+		group = group,
+		pattern = "CodeDiffOpen",
+		once = true,
+		callback = function()
+			vim.schedule(restore)
+		end,
+	})
+	vim.defer_fn(restore, 10000)
+
+	local ok, result = pcall(fn)
+	if not ok then
+		restore()
+		error(result)
+	end
+
+	return result
+end
+
 local function open_revision_snapshot_command(snapshot)
 	local original_revision = snapshot.original_revision
 	local modified_revision = snapshot.modified_revision
@@ -431,6 +480,8 @@ local function apply_snapshot(get_codediff_lifecycle, snapshot, deps, attempt)
 			end
 		end
 
+		-- Resume normally starts hidden via with_initial_explorer_hidden, so this
+		-- toggle is only a backstop for when that missed.
 		local hide_explorer = snapshot.explorer_hidden and not current_explorer.is_hidden
 		local wait_for_resize = hide_explorer and #vim.api.nvim_list_uis() > 0
 		if wait_for_resize then
@@ -469,15 +520,20 @@ function M.resume(get_codediff_lifecycle, deps)
 	last_resume_snapshot = snapshot
 
 	if snapshot.original_revision then
-		if not open_revision_snapshot(snapshot) then
+		local opened = with_initial_explorer_hidden(snapshot.explorer_hidden, function()
+			return open_revision_snapshot(snapshot)
+		end)
+		if not opened then
 			M.clear_persisted()
 			return
 		end
 	else
-		deps.open_status_explorer(snapshot.repo, snapshot.file_path, {
-			hide_untracked = snapshot.hide_untracked,
-			focus_diff = true,
-		}, get_codediff_lifecycle)
+		with_initial_explorer_hidden(snapshot.explorer_hidden, function()
+			deps.open_status_explorer(snapshot.repo, snapshot.file_path, {
+				hide_untracked = snapshot.hide_untracked,
+				focus_diff = true,
+			}, get_codediff_lifecycle)
+		end)
 	end
 
 	vim.defer_fn(function()
