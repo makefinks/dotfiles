@@ -11,7 +11,11 @@ MANAGED_PATHS=(
 	".pi/agent/themes/dark-blue-code.json"
 	".pi/agent/keybindings.json"
 	".pi/agent/extensions/leader-hotkeys.ts"
-	".pi/agent/extensions/read-preview.ts"
+	".pi/agent/extensions/hide-input-bottom-border.ts"
+	".pi/agent/extensions/keep-last-model.ts"
+	".pi/agent/extensions/single-line-footer.ts"
+	".pi/agent/extensions/quotas.json"
+	".pi/agent/extensions/pi-tool-display/config.json"
 	".tmux.conf"
 	".zshrc.oh-my-zsh"
 )
