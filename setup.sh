@@ -8,6 +8,7 @@ MANAGED_PATHS=(
 	".config/zsh"
 	".pi/settings.json"
 	".pi/agent/settings.json"
+	".pi/agent/mcp.json"
 	".pi/agent/themes/dark-blue-code.json"
 	".pi/agent/keybindings.json"
 	".pi/agent/extensions/leader-hotkeys.ts"
