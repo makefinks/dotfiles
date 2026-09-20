@@ -8,13 +8,10 @@ MANAGED_PATHS=(
 	".config/zsh"
 	".pi/settings.json"
 	".pi/agent/settings.json"
-	".pi/agent/themes/charcoal.json"
+	".pi/agent/themes/dark-blue-code.json"
 	".pi/agent/keybindings.json"
-	".pi/agent/extensions/file-picker.ts"
 	".pi/agent/extensions/leader-hotkeys.ts"
 	".pi/agent/extensions/read-preview.ts"
-	".pi/agent/extensions/reasoning-animation.ts"
-	".pi/agent/extensions/working-animations.ts"
 	".tmux.conf"
 	".zshrc.oh-my-zsh"
 )
@@ -27,6 +24,55 @@ POWERLEVEL10K_DIR="$OH_MY_ZSH_CUSTOM_DIR/themes/powerlevel10k"
 ZSH_RC="$HOME/.zshrc"
 DOTFILES_ZSH_RC="$HOME/.zshrc.oh-my-zsh"
 
+# Section banners (plain text when not a terminal).
+if [[ -t 1 ]] && command -v tput &>/dev/null; then
+	C_BOLD="$(tput bold)"
+	C_STEP="$(tput setaf 5)"
+	C_RESET="$(tput sgr0)"
+else
+	C_BOLD=""
+	C_STEP=""
+	C_RESET=""
+fi
+
+step() {
+	local title="STEP $1 - $2"
+	printf '\n%s╔══════════════════════════════════════════════════╗\n' "$C_BOLD$C_STEP"
+	printf '║  %-46.46s  ║\n' "$title"
+	printf '╚══════════════════════════════════════════════════╝%s\n' "$C_RESET"
+}
+
+# Quiet by default; pass --verbose to see full tool output.
+VERBOSE=0
+if [[ "${1:-}" == "--verbose" ]]; then
+	VERBOSE=1
+elif [[ -n "${1:-}" ]]; then
+	echo "Usage: $0 [--verbose]" >&2
+	exit 1
+fi
+
+# Quiet flags are plain strings (not arrays) for macOS bash 3.2 compat.
+if [[ $VERBOSE == 1 ]]; then
+	GIT_Q=""
+	NPM_Q=""
+	STOW_Q="-v"
+	MV_Q="-v"
+else
+	GIT_Q="--quiet"
+	NPM_Q="--silent --no-audit --no-fund"
+	STOW_Q=""
+	MV_Q=""
+fi
+
+# Run a noisy command, hiding stdout unless --verbose (stderr still shows).
+run() {
+	if [[ $VERBOSE == 1 ]]; then
+		"$@"
+	else
+		"$@" >/dev/null
+	fi
+}
+
 clone_or_update_repo() {
 	local name="$1"
 	local repo_url="$2"
@@ -34,7 +80,7 @@ clone_or_update_repo() {
 
 	if [[ -d "$dest/.git" ]]; then
 		echo "Updating $name..."
-		git -C "$dest" pull --ff-only
+		git -C "$dest" pull ${GIT_Q} --ff-only
 		return
 	fi
 
@@ -45,7 +91,7 @@ clone_or_update_repo() {
 
 	echo "Cloning $name..."
 	mkdir -p "$(dirname "$dest")"
-	git clone --depth 1 "$repo_url" "$dest"
+	git clone ${GIT_Q} --depth 1 "$repo_url" "$dest"
 }
 
 ensure_zshrc_sources_dotfiles() {
@@ -76,8 +122,8 @@ install_pi_packages() {
 	local settings_file="$DOTFILES_DIR/pi/.pi/agent/settings.json"
 	while IFS= read -r package; do
 		[[ -n "$package" ]] || continue
-		echo "Installing Pi package $package..."
-		pi install "$package"
+		[[ $VERBOSE == 1 ]] && echo "Installing Pi package $package..."
+		run pi install "$package"
 	done < <(node -e '
 const fs = require("fs");
 const settings = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
@@ -89,6 +135,7 @@ for (const package of settings.packages ?? []) {
 }
 
 # Install dependencies
+step "1/5" "System dependencies"
 if [[ "$OSTYPE" == "darwin"* ]]; then
 	if ! command -v brew &>/dev/null; then
 		echo "Installing Homebrew..."
@@ -96,45 +143,47 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 	fi
 
 	echo "Installing dependencies via Homebrew..."
-	brew install stow neovim tmux zsh git curl node python rust fd ripgrep fzf wget imagemagick luarocks viu shfmt shellcheck
+	run brew install stow neovim tmux zsh git curl node python rust fd ripgrep fzf imagemagick shfmt shellcheck
 
-	echo "Installing neovim language clients..."
-	npm install -g neovim
-	pip3 install pynvim
+	echo "Installing neovim node client..."
+	# shellcheck disable=SC2086
+	run npm install -g ${NPM_Q} neovim
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
 	if command -v apt-get &>/dev/null; then
 		echo "Installing dependencies via apt..."
-		sudo apt-get update
-		sudo apt-get install -y stow neovim tmux zsh git curl nodejs python3 python3-pip python3-pynvim rustc cargo fd-find ripgrep fzf wget imagemagick luarocks shfmt shellcheck
+		run sudo apt-get update
+		run sudo apt-get install -y stow neovim tmux zsh git curl nodejs python3 rustc cargo fd-find ripgrep fzf imagemagick shfmt shellcheck
 
 		if ! command -v npm &>/dev/null; then
-			sudo apt-get install -y npm
+			run sudo apt-get install -y npm
 		fi
 
 		if ! command -v fd &>/dev/null; then
 			sudo ln -s "$(which fdfind)" /usr/local/bin/fd
 		fi
 
-		echo "Installing neovim language clients..."
-		sudo npm install -g neovim
+		echo "Installing neovim node client..."
+		# shellcheck disable=SC2086
+		run sudo npm install -g ${NPM_Q} neovim
 	elif command -v dnf &>/dev/null; then
 		echo "Installing dependencies via dnf..."
-		sudo dnf install -y stow neovim tmux zsh git curl nodejs python3 python3-pip rust cargo fd-find ripgrep fzf wget ImageMagick luarocks shfmt ShellCheck
+		run sudo dnf install -y stow neovim tmux zsh git curl nodejs python3 rust cargo fd-find ripgrep fzf ImageMagick shfmt ShellCheck
 
-		echo "Installing neovim language clients..."
-		sudo npm install -g neovim
-		pip3 install pynvim
+		echo "Installing neovim node client..."
+		# shellcheck disable=SC2086
+		run sudo npm install -g ${NPM_Q} neovim
 	elif command -v pacman &>/dev/null; then
 		echo "Installing dependencies via pacman..."
-		arch_packages=(stow neovim tmux ghostty zsh git curl nodejs npm python python-pynvim rust fd ripgrep fzf wget imagemagick luarocks viu shfmt shellcheck)
+		arch_packages=(stow neovim tmux ghostty zsh git curl nodejs npm python rust fd ripgrep fzf imagemagick shfmt shellcheck)
 		if command -v omarchy &>/dev/null; then
-			omarchy pkg add "${arch_packages[@]}"
+			run omarchy pkg add "${arch_packages[@]}"
 		else
-			sudo pacman -S --needed --noconfirm "${arch_packages[@]}"
+			run sudo pacman -S --needed --noconfirm "${arch_packages[@]}"
 		fi
 
-		echo "Installing neovim language clients..."
-		sudo npm install -g neovim
+		echo "Installing neovim node client..."
+		# shellcheck disable=SC2086
+		run sudo npm install -g ${NPM_Q} neovim
 	else
 		echo "Unsupported package manager. Please install dependencies manually"
 		exit 1
@@ -144,28 +193,34 @@ else
 	exit 1
 fi
 
-echo "Installing Oh My Zsh and Powerlevel10k..."
+step "2/5" "Oh My Zsh and Powerlevel10k"
 clone_or_update_repo "Oh My Zsh" "https://github.com/ohmyzsh/ohmyzsh.git" "$OH_MY_ZSH_DIR"
 clone_or_update_repo "Powerlevel10k" "https://github.com/romkatv/powerlevel10k.git" "$POWERLEVEL10K_DIR"
 
+step "3/5" "Backing up and linking dotfiles"
 # Keep Pi's generated auth, sessions, and package files outside the Stow package.
 mkdir -p "$TARGET/.pi/agent/extensions" "$TARGET/.pi/agent/themes"
 
 # Back up only the application configs owned by this repository. Walking each
 # Stow package also visits .config itself, which would move the entire directory.
 mkdir -p "$BACKUP"
+BACKED_UP=0
 for rel_path in "${MANAGED_PATHS[@]}"; do
 	dest="$TARGET/$rel_path"
 	if [[ -e "$dest" && ! -L "$dest" ]]; then
 		mkdir -p "$BACKUP/$(dirname "$rel_path")"
-		mv -v "$dest" "$BACKUP/$rel_path"
+		mv ${MV_Q} "$dest" "$BACKUP/$rel_path"
+		BACKED_UP=$((BACKED_UP + 1))
 	fi
 done
+echo "Backed up $BACKED_UP file(s) to $BACKUP."
 
 # Create (or refresh) symlinks
-stow -v -R --dir="$DOTFILES_DIR" --target="$TARGET" "${PKGS[@]}"
+stow ${STOW_Q} -R --dir="$DOTFILES_DIR" --target="$TARGET" "${PKGS[@]}"
 
+step "4/5" "Pi extensions"
 install_pi_packages
+step "5/5" "Shell integration"
 ensure_zshrc_sources_dotfiles
 
-echo "Done. Backups (if any): $BACKUP"
+printf '%sDone.%s Linked %d packages, backed up %d file(s): %s\n' "$C_BOLD" "$C_RESET" "${#PKGS[@]}" "$BACKED_UP" "$BACKUP"
