@@ -25,6 +25,9 @@ return {
 			},
 			-- Use codediff as the diff viewer instead of the old diffview setup.
 			diff_viewer = "codediff",
+			preview_buffer = {
+				kind = "vsplit",
+			},
 			commit_editor = {
 				show_staged_diff = false,
 				spell_check = true,
