@@ -25,6 +25,38 @@ local function exclude_never_show(cmd, _, _, args)
 	return args
 end
 
+local function search_selected_folder(state, picker)
+	local node = state.tree and state.tree:get_node() or nil
+	if not node or (node.type ~= "directory" and node.type ~= "file") then
+		return
+	end
+
+	local path = node:get_id()
+	local folder = node.type == "directory" and path or vim.fn.fnamemodify(path, ":h")
+	local opts = { cwd = folder }
+	if picker == "live_grep" then
+		opts.title = "FFFuzzy Grep"
+		opts.grep = { modes = { "plain", "fuzzy" } }
+	end
+
+	local ok_lazy, lazy = pcall(require, "lazy")
+	if ok_lazy and lazy.load then
+		lazy.load({ plugins = { "fff.nvim" } })
+	end
+
+	local ok, fff = pcall(require, "fff")
+	if ok and fff[picker] then
+		fff[picker](opts)
+		return
+	end
+
+	local fallback_ok, snacks = pcall(require, "snacks")
+	local fallback = picker == "find_files" and "files" or "grep"
+	if fallback_ok and snacks.picker and snacks.picker[fallback] then
+		snacks.picker[fallback](opts)
+	end
+end
+
 return {
 	"nvim-neo-tree/neo-tree.nvim",
 	opts = {
@@ -42,26 +74,18 @@ return {
 			window = {
 				mappings = {
 					["/"] = "fuzzy_finder",
+					["ff"] = false,
+					["fw"] = false,
+					["FF"] = "find_files_in_dir",
+					["FW"] = "grep_in_dir",
 				},
 			},
 			commands = {
-				find_files_in_dir = function()
-					local ok_lazy, lazy = pcall(require, "lazy")
-					if ok_lazy and lazy and lazy.load then
-						lazy.load({ plugins = { "fff.nvim" } })
-					end
-
-					local ok, fff = pcall(require, "fff")
-					if ok and fff and fff.find_files then
-						fff.find_files()
-						return
-					end
-
-					local fallback_ok, snacks = pcall(require, "snacks")
-					if fallback_ok and snacks.picker and snacks.picker.files then
-						snacks.picker.files()
-						return
-					end
+				find_files_in_dir = function(state)
+					search_selected_folder(state, "find_files")
+				end,
+				grep_in_dir = function(state)
+					search_selected_folder(state, "live_grep")
 				end,
 			},
 			find_args = exclude_never_show,

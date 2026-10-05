@@ -217,6 +217,120 @@ local function open_with_fff_grep()
 	assert_cursor_line(1, "fff grep")
 end
 
+local function verify_neo_tree_folder_search()
+	local root = picker_fixtures_dir .. "/scoped"
+	local folder = root .. "/selected"
+	local cwd_before = vim.fn.getcwd()
+	local search_before = vim.fn.getreg("/")
+	vim.api.nvim_set_current_dir(root)
+	-- This harness uses --noplugin, so Lazy is not initialized. Load dependencies
+	-- explicitly, as the other picker checks do, and bypass its loader for this step.
+	for _, plugin in ipairs({ "nui.nvim", "plenary.nvim", "neo-tree.nvim", "AstroNvim" }) do
+		local path = vim.fn.stdpath("data") .. "/lazy/" .. plugin
+		assert(vim.fn.isdirectory(path) == 1, "missing plugin directory: " .. path)
+		vim.opt.rtp:prepend(path)
+	end
+	local inherited_opts = {}
+	for _, spec in ipairs(require("astronvim.plugins.snacks").specs) do
+		if spec[1] == "nvim-neo-tree/neo-tree.nvim" then
+			inherited_opts = spec.opts
+		end
+	end
+	local opts = vim.tbl_deep_extend("force", {}, inherited_opts, require("plugins.navigation.neo-tree").opts)
+	opts.filesystem.bind_to_cwd = false
+	opts.filesystem.hijack_netrw_behavior = "disabled"
+	require("neo-tree").setup(opts)
+	local original_lazy = package.loaded.lazy
+	package.loaded.lazy = { load = function() end }
+	local original_f = vim.fn.maparg("F", "n", false, true)
+	vim.keymap.set("n", "F", require("plugins.core.astrocore").opts.mappings.n.F[1])
+	local original_ff = vim.fn.maparg("ff", "n", false, true)
+	for _, mapping in ipairs(require("plugins.navigation.fff").keys) do
+		if mapping[1] == "ff" then
+			vim.keymap.set("n", "ff", mapping[2])
+		end
+	end
+	local command = require("neo-tree.command")
+	local renderer = require("neo-tree.ui.renderer")
+	local picker_ui = require("fff.picker_ui.picker_ui")
+	local state
+
+	local ok, err = xpcall(function()
+		command.execute({ source = "filesystem", action = "focus", dir = root })
+		wait_until("Neo-tree did not render the selected folder", function()
+			state = require("neo-tree.sources.manager").get_state_for_window()
+			return state and state.tree and state.tree:get_node(folder) ~= nil
+		end)
+
+		for _, key in ipairs({ "FF", "FW" }) do
+			vim.api.nvim_set_current_win(state.winid)
+			renderer.focus_node(state, folder)
+			assert(vim.fn.maparg(key, "n", false, true).buffer == 1, key .. " must be buffer-local")
+			vim.api.nvim_feedkeys(key, "xt", false)
+			wait_until(key .. " did not open a scoped fff picker", function()
+				return picker_ui.state.active and fff_picker_ready(folder)
+			end, 8000)
+
+			if key == "FW" then
+				picker_ui.state.query = "scoped needle"
+				picker_ui.update_results()
+			end
+			wait_until(key .. " did not return both direct and nested files", function()
+				return #picker_ui.state.filtered_items == 2
+			end)
+			local found_nested = false
+			for _, item in ipairs(picker_ui.state.filtered_items) do
+				assert(
+					item.relative_path == "target.txt" or item.relative_path == "nested/target.txt",
+					key .. " escaped the selected folder"
+				)
+				found_nested = found_nested or item.relative_path == "nested/target.txt"
+			end
+			assert(found_nested, key .. " did not search recursively")
+			assert(vim.fn.getcwd() == root, key .. " changed Neovim's cwd")
+			assert(vim.fn.getreg("/") == search_before, key .. " triggered the single-F search")
+			picker_ui.close()
+			vim.cmd.stopinsert()
+
+			vim.api.nvim_set_current_win(state.winid)
+			assert(vim.fn.maparg("ff", "n", false, true).buffer == 0, "lowercase ff must use the global picker")
+			vim.api.nvim_feedkeys("ff", "xt", false)
+			wait_until("lowercase ff did not restore project-wide results after " .. key, function()
+				if not picker_ui.state.active or not fff_picker_ready(root) then
+					return false
+				end
+				for _, item in ipairs(picker_ui.state.filtered_items) do
+					if item.relative_path == "sibling/target.txt" then
+						return true
+					end
+				end
+				return false
+			end, 8000)
+			picker_ui.close()
+			vim.cmd.stopinsert()
+		end
+	end, debug.traceback)
+
+	if picker_ui.state.active then
+		picker_ui.close()
+	end
+	vim.cmd.stopinsert()
+	command.execute({ source = "filesystem", action = "close" })
+	package.loaded.lazy = original_lazy
+	vim.keymap.del("n", "F")
+	if next(original_f) then
+		vim.fn.mapset("n", false, original_f)
+	end
+	vim.keymap.del("n", "ff")
+	if next(original_ff) then
+		vim.fn.mapset("n", false, original_ff)
+	end
+	vim.api.nvim_set_current_dir(cwd_before)
+	if not ok then
+		error(err)
+	end
+end
+
 local function verify_ty_lsp_attach()
 	local project_root = fixtures_dir .. "/ty_project"
 	local target = project_root .. "/main.py"
@@ -308,6 +422,7 @@ function M.run()
 	run_step("fff picker open", open_with_fff_picker)
 	run_step("snacks grep open", open_with_snacks_grep)
 	run_step("fff grep open", open_with_fff_grep)
+	run_step("Neo-tree scoped fff search", verify_neo_tree_folder_search)
 	run_step("ty lsp attach", verify_ty_lsp_attach)
 
 	if #errors > 0 then

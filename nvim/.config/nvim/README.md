@@ -106,6 +106,12 @@ This list tracks the top-level plugins configured in `lua/plugins/`. AstroNvim a
 | Workflow | **resession.nvim**, **vim-startuptime**, **mole.nvim**, **doubt.nvim** | Session saving, startup profiling, annotation/review sessions, and local workflow tooling |
 | Debugging | **nvim-dap**, **nvim-dap-view** | Debug adapter integration with a persistent debugger UI |
 
+## Neo-tree Folder Search
+
+In Neo-tree's filesystem view, select a folder and press `FF` to find files or `FW` to grep their contents with fff. Both search recursively within that folder, respecting fff's ignore rules. If a file is selected, its parent folder is used instead. No leader key is needed.
+
+Lowercase `ff` and `<leader>ff` retain the normal project-wide picker behavior, as does `<leader>fw` for grep. Neo-tree's inherited lowercase folder-search mappings are disabled so they do not override these global mappings.
+
 ## Validate
 
 From this Neovim config directory, the main commands are:
