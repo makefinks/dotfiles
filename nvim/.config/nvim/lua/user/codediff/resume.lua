@@ -369,6 +369,32 @@ local function path_matches_snapshot(path, snapshot)
 		and vim.fn.fnamemodify(path, ":p") == vim.fn.fnamemodify(snapshot.repo .. "/" .. snapshot.file_path, ":p")
 end
 
+local function reveal_explorer_selection(explorer, snapshot)
+	local winid = explorer.split and explorer.split.winid or explorer.winid
+	if
+		explorer.is_hidden
+		or not winid
+		or not vim.api.nvim_win_is_valid(winid)
+		or not explorer.bufnr
+		or not vim.api.nvim_buf_is_valid(explorer.bufnr)
+		or not explorer.tree
+	then
+		return
+	end
+
+	for line = 1, vim.api.nvim_buf_line_count(explorer.bufnr) do
+		local node = explorer.tree:get_node(line)
+		local data = node and node.data
+		if data and data.path == snapshot.file_path and data.group == snapshot.group then
+			vim.api.nvim_win_set_cursor(winid, { line, 0 })
+			vim._with({ win = winid }, function()
+				vim.cmd("normal! zz")
+			end)
+			return
+		end
+	end
+end
+
 local function restore_cursor_when_ready(get_codediff_lifecycle, tabpage, expected_explorer, snapshot, attempt)
 	attempt = attempt or 1
 	local lifecycle = get_codediff_lifecycle()
@@ -405,7 +431,10 @@ local function restore_cursor_when_ready(get_codediff_lifecycle, tabpage, expect
 		return
 	end
 
-	vim.api.nvim_set_current_win(winid)
+	reveal_explorer_selection(explorer, snapshot)
+	if vim.api.nvim_get_current_tabpage() == tabpage then
+		vim.api.nvim_set_current_win(winid)
+	end
 	pcall(vim.api.nvim_win_set_cursor, winid, clamp_cursor_position(bufnr, snapshot.cursor))
 	vim._with({ win = winid }, function()
 		vim.cmd("normal! zz")
@@ -413,29 +442,25 @@ local function restore_cursor_when_ready(get_codediff_lifecycle, tabpage, expect
 	last_resume_snapshot = snapshot
 end
 
-local function apply_snapshot(get_codediff_lifecycle, snapshot, deps, attempt)
-	attempt = attempt or 1
-	local max_attempts = 80
+local function apply_snapshot(get_codediff_lifecycle, snapshot, deps, tabpage, expected_explorer)
 	local lifecycle = get_codediff_lifecycle()
 	if not lifecycle then
 		return
 	end
 
-	local tabpage = vim.api.nvim_get_current_tabpage()
 	local session = lifecycle.get_session(tabpage)
 	local explorer = lifecycle.get_explorer(tabpage)
-	if not session or not explorer or session.mode ~= "explorer" then
-		if attempt >= max_attempts then
-			return
-		end
-
-		vim.defer_fn(function()
-			apply_snapshot(get_codediff_lifecycle, snapshot, deps, attempt + 1)
-		end, 50)
+	if not session or explorer ~= expected_explorer or session.mode ~= "explorer" then
 		return
 	end
+	deps.set_explorer_options(get_codediff_lifecycle, tabpage, { hide_untracked = snapshot.hide_untracked })
 
 	local selection = find_status_entry(explorer.status_result, snapshot.file_path, snapshot.group)
+	if selection then
+		-- The file may have been staged or unstaged since the snapshot was saved.
+		-- Cursor readiness must follow the resolved selection, not its old group.
+		snapshot = vim.tbl_extend("force", snapshot, { group = selection.group })
+	end
 	explorer._user_reviewed = vim.deepcopy(snapshot.reviewed)
 	review.install_renderer(explorer)
 	-- Opening the explorer already starts loading its initial selection. Reselecting
@@ -458,10 +483,9 @@ local function apply_snapshot(get_codediff_lifecycle, snapshot, deps, attempt)
 			return
 		end
 
-		local current_tabpage = vim.api.nvim_get_current_tabpage()
-		local current_session = current_lifecycle.get_session(current_tabpage)
-		local current_explorer = current_lifecycle.get_explorer(current_tabpage)
-		if not current_session or not current_explorer or current_session.mode ~= "explorer" then
+		local current_session = current_lifecycle.get_session(tabpage)
+		local current_explorer = current_lifecycle.get_explorer(tabpage)
+		if not current_session or current_explorer ~= expected_explorer or current_session.mode ~= "explorer" then
 			return
 		end
 
@@ -469,14 +493,14 @@ local function apply_snapshot(get_codediff_lifecycle, snapshot, deps, attempt)
 		review.install_renderer(current_explorer)
 		review.render(current_explorer)
 		if deps.refresh_statusline then
-			deps.refresh_statusline(get_codediff_lifecycle, current_tabpage)
+			deps.refresh_statusline(get_codediff_lifecycle, tabpage)
 		end
 
 		local function restore_position()
 			if selection then
-				restore_cursor_when_ready(get_codediff_lifecycle, current_tabpage, current_explorer, snapshot)
-			else
-				deps.focus_diff_window(get_codediff_lifecycle, current_tabpage)
+				restore_cursor_when_ready(get_codediff_lifecycle, tabpage, current_explorer, snapshot)
+			elseif vim.api.nvim_get_current_tabpage() == tabpage then
+				deps.focus_diff_window(get_codediff_lifecycle, tabpage)
 			end
 		end
 
@@ -496,7 +520,7 @@ local function apply_snapshot(get_codediff_lifecycle, snapshot, deps, attempt)
 			})
 		end
 		if hide_explorer then
-			deps.toggle_explorer(get_codediff_lifecycle, current_tabpage)
+			deps.toggle_explorer(get_codediff_lifecycle, tabpage)
 		end
 		if not wait_for_resize then
 			restore_position()
@@ -519,11 +543,46 @@ function M.resume(get_codediff_lifecycle, deps)
 
 	last_resume_snapshot = snapshot
 
+	-- Revision discovery can take seconds in a large repo. Bind restoration to
+	-- the actual view opening, rather than polling whichever tab is current.
+	local restore_autocmd
+	local function cancel_restore()
+		if restore_autocmd then
+			pcall(vim.api.nvim_del_autocmd, restore_autocmd)
+			restore_autocmd = nil
+		end
+	end
+	restore_autocmd = vim.api.nvim_create_autocmd("User", {
+		group = vim.api.nvim_create_augroup("user_codediff_resume_open", { clear = true }),
+		pattern = "CodeDiffOpen",
+		callback = function(args)
+			local lifecycle = get_codediff_lifecycle()
+			local tabpage = args.data and args.data.tabpage or vim.api.nvim_get_current_tabpage()
+			local explorer = lifecycle and lifecycle.get_explorer(tabpage)
+			if
+				not explorer
+				or explorer.git_root ~= snapshot.repo
+				or explorer.base_revision ~= snapshot.original_revision
+				or explorer.target_revision ~= snapshot.modified_revision
+			then
+				return
+			end
+
+			cancel_restore()
+			-- Let the opener's scheduled initial selection run first.
+			vim.schedule(function()
+				apply_snapshot(get_codediff_lifecycle, snapshot, deps, tabpage, explorer)
+			end)
+		end,
+	})
+	vim.defer_fn(cancel_restore, 30000)
+
 	if snapshot.original_revision then
 		local opened = with_initial_explorer_hidden(snapshot.explorer_hidden, function()
 			return open_revision_snapshot(snapshot)
 		end)
 		if not opened then
+			cancel_restore()
 			M.clear_persisted()
 			return
 		end
@@ -535,18 +594,6 @@ function M.resume(get_codediff_lifecycle, deps)
 			}, get_codediff_lifecycle)
 		end)
 	end
-
-	vim.defer_fn(function()
-		local lifecycle = get_codediff_lifecycle()
-		local tabpage = vim.api.nvim_get_current_tabpage()
-		if lifecycle and lifecycle.get_session(tabpage) then
-			deps.set_explorer_options(get_codediff_lifecycle, tabpage, {
-				hide_untracked = snapshot.hide_untracked,
-			})
-		end
-
-		apply_snapshot(get_codediff_lifecycle, snapshot, deps)
-	end, 80)
 end
 
 function M.clear_persisted()

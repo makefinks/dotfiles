@@ -7,6 +7,8 @@ local original_lsp_buf_request_all
 local original_lsp_get_client_by_id
 local original_lsp_get_clients
 local original_resolve_revision
+local original_get_file_content
+local original_get_diff_revisions_with_line_stats
 local repo
 local echo_capture
 
@@ -81,6 +83,7 @@ local function create_two_revision_repo()
 		"",
 		"return alpha",
 	})
+	repo.write_file("beta.lua", { "local beta = {", "  value = 'beta',", "}", "", "return beta" })
 	repo.git_ok({ "add", "." })
 	repo.git_ok({ "commit", "-m", "initial" })
 	local base_revision = vim.trim(repo.git_ok({ "rev-parse", "HEAD" }))
@@ -92,11 +95,28 @@ local function create_two_revision_repo()
 		"",
 		"return alpha",
 	})
+	repo.write_file("beta.lua", { "local beta = {", "  value = 'beta changed',", "}", "", "return beta" })
 	repo.git_ok({ "add", "." })
 	repo.git_ok({ "commit", "-m", "change alpha" })
 	local head_revision = vim.trim(repo.git_ok({ "rev-parse", "HEAD" }))
 
 	return repo, base_revision, head_revision
+end
+
+local function create_large_pr_repo()
+	repo = h.create_temp_git_repo()
+	for index = 1, 80 do
+		repo.write_file(string.format("file_%03d.lua", index), { "local value = 'base'", "", "return value" })
+	end
+	repo.git_ok({ "add", "." })
+	repo.git_ok({ "commit", "-m", "base" })
+	repo.git_ok({ "checkout", "-b", "feature" })
+	for index = 1, 80 do
+		repo.write_file(string.format("file_%03d.lua", index), { "local value = 'feature'", "", "return value" })
+	end
+	repo.git_ok({ "add", "." })
+	repo.git_ok({ "commit", "-m", "feature" })
+	return repo
 end
 
 local function create_modified_and_untracked_repo()
@@ -231,6 +251,17 @@ describe("local CodeDiff workflow", function()
 	end)
 
 	after_each(function()
+		if original_get_diff_revisions_with_line_stats then
+			require("codediff.core.git").get_diff_revisions_with_line_stats =
+				original_get_diff_revisions_with_line_stats
+			original_get_diff_revisions_with_line_stats = nil
+		end
+
+		if original_get_file_content then
+			require("codediff.core.git").get_file_content = original_get_file_content
+			original_get_file_content = nil
+		end
+
 		if original_resolve_revision then
 			require("codediff.core.git").resolve_revision = original_resolve_revision
 			original_resolve_revision = nil
@@ -1126,6 +1157,26 @@ describe("local CodeDiff workflow", function()
 		end, 10000, "Resume did not preserve staged and unstaged status groups")
 	end)
 
+	it("restores the cursor when the saved file moves to another status group", function()
+		local view = require("user.codediff.view")
+		repo = create_multiline_modified_files_repo()
+		repo.git_ok({ "add", "alpha.lua" })
+		local tabpage, session = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
+		h.wait_for(function()
+			return session.stored_diff_result ~= nil and vim.api.nvim_buf_line_count(session.modified_bufnr) == 5
+		end)
+		h.focus_modified_window(tabpage)
+		vim.api.nvim_win_set_cursor(0, { 5, 2 })
+		view.close_view(h.get_codediff_lifecycle)
+		repo.git_ok({ "reset", "HEAD", "--", "alpha.lua" })
+		view.resume_last_session(h.get_codediff_lifecycle)
+		local _, resumed_session = h.wait_for_explorer_session({ file_path = "alpha.lua", group = "unstaged" })
+		h.wait_for(function()
+			return vim.api.nvim_get_current_win() == resumed_session.modified_win
+				and vim.deep_equal(vim.api.nvim_win_get_cursor(resumed_session.modified_win), { 5, 2 })
+		end, 11000, "CodeDiff did not restore the cursor after the file changed groups")
+	end)
+
 	it("resumes reviewed file marks from persisted state", function()
 		local view = require("user.codediff.view")
 		local lifecycle = h.get_codediff_lifecycle()
@@ -1259,6 +1310,107 @@ describe("local CodeDiff workflow", function()
 		assert.equals(base_revision, resumed_session.original_revision)
 		assert.equals(head_revision, resumed_session.modified_revision)
 	end)
+
+	for _, hidden in ipairs({ false, true }) do
+		it("resumes a non-first revision file with the sidebar " .. (hidden and "hidden" or "visible"), function()
+			local view = require("user.codediff.view")
+			local base_revision, head_revision
+			repo, base_revision, head_revision = create_two_revision_repo()
+			vim.fn.chdir(repo.dir)
+			vim.cmd("CodeDiff " .. base_revision .. " " .. head_revision)
+			local tabpage, session, explorer = h.wait_for_explorer_session({ file_path = "alpha.lua" })
+			h.wait_for(function()
+				return session.stored_diff_result ~= nil
+			end)
+			view.select_explorer_file(explorer, h.find_tree_entry(explorer, "beta.lua", "unstaged").data)
+			h.wait_for(function()
+				return session.stored_diff_result ~= nil
+					and session.modified.relative == "beta.lua"
+					and vim.api.nvim_buf_line_count(session.modified_bufnr) == 5
+			end)
+			h.set_explorer_hidden(tabpage, hidden)
+			h.focus_modified_window(tabpage)
+			vim.api.nvim_win_set_cursor(0, { 5, 2 })
+			view.close_view(h.get_codediff_lifecycle)
+
+			local git = require("codediff.core.git")
+			original_get_file_content = git.get_file_content
+			git.get_file_content = function(revision, git_root, file_path, callback)
+				original_get_file_content(revision, git_root, file_path, function(err, lines)
+					vim.defer_fn(function()
+						callback(err, lines)
+					end, 350)
+				end)
+			end
+			require("user.codediff").resume_last_session()
+			local _, resumed_session = h.wait_for_explorer_session({ file_path = "beta.lua" })
+			local function position_restored()
+				return resumed_session.modified.relative == "beta.lua"
+					and vim.api.nvim_get_current_win() == resumed_session.modified_win
+					and vim.deep_equal(vim.api.nvim_win_get_cursor(resumed_session.modified_win), { 5, 2 })
+			end
+			h.wait_for(position_restored, 10000, "CodeDiff did not restore the non-first revision file cursor")
+			assert.is_false(vim.wait(600, function()
+				return not position_restored()
+			end, 10))
+		end)
+	end
+
+	for _, discovery_delay in ipairs({ 0, 4500 }) do
+		it("resumes a large PR past the sidebar viewport after " .. discovery_delay .. "ms discovery", function()
+			local view = require("user.codediff.view")
+			repo = create_large_pr_repo()
+			vim.fn.chdir(repo.dir)
+			with_branch_and_mode("main", "PR diff", function()
+				require("user.codediff").open_pr_diff_against_branch()
+			end)
+			local tabpage, session, explorer = h.wait_for_explorer_session({ file_path = "file_001.lua" })
+			h.wait_for(function()
+				return session.stored_diff_result ~= nil
+			end)
+			local file_path = "file_075.lua"
+			local file_line = h.find_tree_line(explorer, file_path, "unstaged")
+			assert.is_true(file_line > vim.api.nvim_win_get_height(explorer.winid))
+			vim.api.nvim_set_current_win(explorer.winid)
+			vim.api.nvim_win_set_cursor(0, { file_line, 0 })
+			view.open_explorer_entry(h.get_codediff_lifecycle, tabpage, explorer)
+			h.wait_for(function()
+				return session.modified.relative == file_path and session.stored_diff_result ~= nil
+			end)
+			h.focus_modified_window(tabpage)
+			vim.api.nvim_win_set_cursor(0, { 3, 2 })
+			view.close_view(h.get_codediff_lifecycle)
+			-- Do not leave the saved file in the normal editor: upstream would then
+			-- use that buffer as its initial selection and mask resume's own behavior.
+			vim.cmd("enew")
+
+			local git = require("codediff.core.git")
+			original_get_diff_revisions_with_line_stats = git.get_diff_revisions_with_line_stats
+			git.get_diff_revisions_with_line_stats = function(rev1, rev2, git_root, callback, pathspec)
+				original_get_diff_revisions_with_line_stats(rev1, rev2, git_root, function(err, result)
+					vim.defer_fn(function()
+						callback(err, result)
+					end, discovery_delay)
+				end, pathspec)
+			end
+			require("user.codediff").resume_last_session()
+			local _, resumed_session, resumed_explorer = h.wait_for_explorer_session({ file_path = file_path })
+			local function position_restored()
+				return resumed_session.modified.relative == file_path
+					and vim.api.nvim_get_current_win() == resumed_session.modified_win
+					and vim.deep_equal(vim.api.nvim_win_get_cursor(resumed_session.modified_win), { 3, 2 })
+			end
+			h.wait_for(position_restored, 10000, "CodeDiff did not restore the large PR's saved file and cursor")
+			assert.is_false(vim.wait(600, function()
+				return not position_restored()
+			end, 10))
+			local restored_line = h.find_tree_line(resumed_explorer, file_path, "unstaged")
+			assert.equals(restored_line, vim.api.nvim_win_get_cursor(resumed_explorer.winid)[1])
+			vim._with({ win = resumed_explorer.winid }, function()
+				assert.is_true(restored_line >= vim.fn.line("w0") and restored_line <= vim.fn.line("w$"))
+			end)
+		end)
+	end
 
 	it("keeps untracked files hidden after resuming revision explorers", function()
 		local view = require("user.codediff.view")
