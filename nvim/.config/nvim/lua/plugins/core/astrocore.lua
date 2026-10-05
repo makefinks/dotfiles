@@ -3,7 +3,25 @@
 -- NOTE: We highly recommend setting up the Lua Language Server (`:LspInstall lua_ls`)
 --       as this provides autocomplete and documentation while editing
 
----Resolve the current relative path, including the selected Neo-tree node.
+---Resolve CodeDiff revision buffers to the underlying file path.
+local function get_current_codediff_path()
+	local name = vim.api.nvim_buf_get_name(0)
+	if not name:match("^codediff://") then
+		return nil
+	end
+
+	local ok, virtual_file = pcall(require, "codediff.core.virtual_file")
+	if not ok then
+		return nil
+	end
+
+	local git_root, _, file_path = virtual_file.parse_url(name)
+	if git_root and file_path then
+		return vim.fs.joinpath(git_root, file_path)
+	end
+end
+
+---Resolve the current relative path, including virtual buffers and the selected Neo-tree node.
 local function get_current_path()
 	if vim.bo.filetype == "neo-tree" then
 		-- Neo-tree uses a synthetic buffer name, so read the selected node instead.
@@ -16,6 +34,11 @@ local function get_current_path()
 				return vim.fn.fnamemodify(node_path, ":.")
 			end
 		end
+	end
+
+	local codediff_path = get_current_codediff_path()
+	if codediff_path then
+		return vim.fn.fnamemodify(codediff_path, ":.")
 	end
 
 	return vim.fn.expand("%:.")
@@ -32,6 +55,11 @@ local function get_current_absolute_path()
 				return vim.fn.fnamemodify(node_path, ":p")
 			end
 		end
+	end
+
+	local codediff_path = get_current_codediff_path()
+	if codediff_path then
+		return vim.fn.fnamemodify(codediff_path, ":p")
 	end
 
 	return vim.fn.expand("%:p")
