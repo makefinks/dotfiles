@@ -1,6 +1,9 @@
 ---@type LazySpec
 return {
 	"esmuellert/codediff.nvim",
+	-- Keep the current API until the custom CodeDiff integration is migrated.
+	commit = "31510a9b34c032b6fe98fc158d4066702f68cff2",
+	pin = true,
 	cmd = { "CodeDiff" },
 	keys = {
 		{
