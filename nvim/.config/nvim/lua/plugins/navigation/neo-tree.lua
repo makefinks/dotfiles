@@ -65,6 +65,10 @@ return {
 		},
 		window = {
 			width = 50,
+			mappings = {
+				["<C-CR>"] = "open_vsplit",
+				["s"] = "none",
+			},
 			mapping_options = {
 				noremap = true,
 				nowait = true,

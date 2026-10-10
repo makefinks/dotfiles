@@ -60,6 +60,20 @@ function M.side_by_side(error_message, functions, opts)
 	return helpers.require_module("codediff.ui.view.side_by_side", error_message, opts)
 end
 
+function M.open_files(left, right)
+	local view = M.view("Codediff is not available", "create")
+	if not view then
+		return
+	end
+	local path = require("codediff.core.path")
+	view.create({
+		mode = "standalone",
+		original = path.make_ref(left, nil),
+		modified = path.make_ref(right, nil),
+		layout = "side-by-side",
+	}, vim.filetype.match({ filename = left }) or "")
+end
+
 function M.config(error_message, opts)
 	return helpers.require_module("codediff.config", error_message, opts)
 end

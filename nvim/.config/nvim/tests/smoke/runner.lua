@@ -162,6 +162,99 @@ local function open_with_fff_picker()
 	assert_current_buffer(target, "fff picker")
 end
 
+local function verify_fff_vertical_split(is_grep)
+	local picker_dir = picker_fixtures_dir .. (is_grep and "/grep" or "/fff")
+	local target = picker_dir .. (is_grep and "/match.txt" or "/target.txt")
+	ensure_plugin_loaded("fff.nvim", "plugins.navigation.fff")
+	local fff = require("fff")
+	local picker_ui = require("fff.picker_ui.picker_ui")
+	local window_count = #vim.api.nvim_tabpage_list_wins(0)
+	if is_grep then
+		fff.live_grep({ cwd = picker_dir, query = "needle" })
+	else
+		fff.find_files({ cwd = picker_dir })
+	end
+
+	wait_until("fff split picker did not produce a selectable item", function()
+		return picker_ui.state.active and fff_picker_ready(picker_dir) and #picker_ui.state.filtered_items > 0
+	end, 8000)
+
+	vim.api.nvim_set_current_win(picker_ui.state.input_win)
+	local mapping = vim.fn.maparg("<C-CR>", "i", false, true)
+	assert(type(mapping.callback) == "function", "fff prompt is missing the Ctrl+Enter mapping")
+	mapping.callback()
+	wait_until("fff Ctrl+Enter did not open the target in a split", function()
+		return not picker_ui.state.active
+			and vim.api.nvim_buf_get_name(0) == target
+			and #vim.api.nvim_tabpage_list_wins(0) == window_count + 1
+	end)
+	assert_current_buffer(target, "fff Ctrl+Enter")
+	assert(#vim.api.nvim_tabpage_list_wins(0) == window_count + 1, "fff Ctrl+Enter did not create a split")
+	assert(vim.api.nvim_win_get_width(0) < vim.o.columns, "fff Ctrl+Enter did not create a vertical split")
+	vim.cmd.close()
+end
+
+local function verify_fff_diff(is_grep)
+	for _, plugin in ipairs({ "nui.nvim", "plenary.nvim" }) do
+		vim.opt.rtp:prepend(vim.fn.stdpath("data") .. "/lazy/" .. plugin)
+	end
+	ensure_plugin_loaded("codediff.nvim", "plugins.git.codediff")
+	local left = picker_fixtures_dir .. "/snacks/target.txt"
+	local picker_dir = picker_fixtures_dir .. (is_grep and "/grep" or "/fff")
+	local right = picker_dir .. (is_grep and "/match.txt" or "/target.txt")
+	open_fixture(left)
+	local origin_buf = vim.api.nvim_get_current_buf()
+	local origin_tab = vim.api.nvim_get_current_tabpage()
+	local original_lines = vim.api.nvim_buf_get_lines(origin_buf, 0, -1, false)
+	vim.api.nvim_buf_set_lines(origin_buf, 0, -1, false, { "unsaved comparison content" })
+	local picker_ui = require("fff.picker_ui.picker_ui")
+	local lifecycle = require("codediff.ui.lifecycle")
+	-- Plugins are configured explicitly in this --noplugin harness.
+	local original_lazy = package.loaded.lazy
+	package.loaded.lazy = { load = function() end }
+	local ok, err = xpcall(function()
+		if is_grep then
+			require("fff").live_grep({ cwd = picker_dir, query = "needle" })
+		else
+			require("fff").find_files({ cwd = picker_dir })
+		end
+		wait_until("fff diff picker did not produce an item", function()
+			return picker_ui.state.active and fff_picker_ready(picker_dir) and #picker_ui.state.filtered_items > 0
+		end, 8000)
+		vim.api.nvim_set_current_win(is_grep and picker_ui.state.list_win or picker_ui.state.input_win)
+		local mapping = vim.fn.maparg("<C-d>", is_grep and "n" or "i", false, true)
+		assert(type(mapping.callback) == "function", "fff is missing its Ctrl+D mapping")
+		mapping.callback()
+		wait_until("fff Ctrl+D did not open CodeDiff", function()
+			return not picker_ui.state.active
+				and vim.api.nvim_get_current_tabpage() ~= origin_tab
+				and lifecycle.get_session(vim.api.nvim_get_current_tabpage()) ~= nil
+		end)
+		local session = lifecycle.get_session(vim.api.nvim_get_current_tabpage())
+		wait_until("CodeDiff did not load both files", function()
+			return session.original_bufnr and session.modified_bufnr
+		end)
+		assert(vim.api.nvim_buf_get_name(session.original_bufnr) == left, "CodeDiff left file is not the origin")
+		assert(vim.api.nvim_buf_get_name(session.modified_bufnr) == right, "CodeDiff right file is not the selection")
+		assert(
+			vim.api.nvim_buf_get_lines(session.original_bufnr, 0, 1, false)[1] == "unsaved comparison content",
+			"CodeDiff lost unsaved buffer changes"
+		)
+	end, debug.traceback)
+	package.loaded.lazy = original_lazy
+	if picker_ui.state.active then
+		picker_ui.close()
+	end
+	if vim.api.nvim_get_current_tabpage() ~= origin_tab then
+		vim.cmd("tabclose!")
+	end
+	vim.api.nvim_buf_set_lines(origin_buf, 0, -1, false, original_lines)
+	vim.bo[origin_buf].modified = false
+	if not ok then
+		error(err)
+	end
+end
+
 local function open_with_snacks_grep()
 	local target = picker_fixtures_dir .. "/grep/match.txt"
 	local picker_dir = picker_fixtures_dir .. "/grep"
@@ -422,6 +515,18 @@ function M.run()
 	run_step("fff picker open", open_with_fff_picker)
 	run_step("snacks grep open", open_with_snacks_grep)
 	run_step("fff grep open", open_with_fff_grep)
+	run_step("fff files Ctrl+Enter split", function()
+		verify_fff_vertical_split(false)
+	end)
+	run_step("fff grep Ctrl+Enter split", function()
+		verify_fff_vertical_split(true)
+	end)
+	run_step("fff files Ctrl+D diff", function()
+		verify_fff_diff(false)
+	end)
+	run_step("fff grep Ctrl+D diff", function()
+		verify_fff_diff(true)
+	end)
 	run_step("Neo-tree scoped fff search", verify_neo_tree_folder_search)
 	run_step("ty lsp attach", verify_ty_lsp_attach)
 

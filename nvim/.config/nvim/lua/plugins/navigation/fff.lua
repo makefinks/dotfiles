@@ -85,6 +85,11 @@ return {
 	-- if you are using nixos
 	-- build = "nix run .#release",
 	opts = { -- (optional)
+		keymaps = {
+			select_vsplit = "<C-CR>",
+			-- Otherwise fff overwrites the insert-mode split mapping with its grep newline action.
+			insert_newline_escape = false,
+		},
 		layout = {
 			prompt_position = "top",
 		},
@@ -95,6 +100,7 @@ return {
 	config = function(_, opts)
 		require("fff").setup(opts)
 		setup_fff_resume_fallback()
+		require("user.fff_diff").setup()
 
 		local ok, preview = pcall(require, "fff.file_picker.preview")
 		if not ok then
