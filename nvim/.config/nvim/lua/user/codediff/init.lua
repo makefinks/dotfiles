@@ -80,20 +80,8 @@ function M.open_pr_diff_against_branch()
 		vim.cmd(command)
 	end
 
-	vim.ui.select({ "PR diff", "Branch vs working tree" }, { prompt = "Compare mode:" }, function(mode)
-		if not mode then
-			return
-		end
-
-		modules.helpers.with_branch(function(branch)
-			local escaped_branch = vim.fn.fnameescape(branch)
-			if mode == "PR diff" then
-				open_filtered_command("CodeDiff " .. escaped_branch .. "...HEAD")
-				return
-			end
-
-			open_filtered_command("CodeDiff " .. escaped_branch)
-		end)
+	modules.helpers.with_branch(function(branch)
+		open_filtered_command("CodeDiff " .. vim.fn.fnameescape(branch) .. "...HEAD")
 	end)
 end
 

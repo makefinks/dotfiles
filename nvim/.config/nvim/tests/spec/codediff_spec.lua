@@ -194,7 +194,7 @@ local function create_large_schema_repo()
 	return repo
 end
 
-local function with_branch_and_mode(branch, mode, callback)
+local function with_branch(branch, callback)
 	local helpers = require("user.codediff.helpers")
 	local original_with_branch = helpers.with_branch
 	local original_select = vim.ui.select
@@ -203,8 +203,8 @@ local function with_branch_and_mode(branch, mode, callback)
 		branch_callback(branch)
 	end
 
-	vim.ui.select = function(_, _, select_callback)
-		select_callback(mode)
+	vim.ui.select = function()
+		error("PR diff should open the branch selector without a mode prompt")
 	end
 
 	local ok, err = pcall(callback)
@@ -1409,7 +1409,7 @@ describe("local CodeDiff workflow", function()
 			local view = require("user.codediff.view")
 			repo = create_large_pr_repo()
 			vim.fn.chdir(repo.dir)
-			with_branch_and_mode("main", "PR diff", function()
+			with_branch("main", function()
 				require("user.codediff").open_pr_diff_against_branch()
 			end)
 			local tabpage, session, explorer = h.wait_for_explorer_session({ file_path = "file_001.lua" })
@@ -1621,11 +1621,11 @@ describe("local CodeDiff workflow", function()
 		end, 10000, "Refresh brought untracked files back into the explorer")
 	end)
 
-	it("opens PR diffs against HEAD without dirty working tree changes", function()
+	it("opens PR diffs directly against HEAD without a mode prompt or dirty working tree changes", function()
 		repo = create_pr_diff_repo_with_dirty_worktree()
 		vim.fn.chdir(repo.dir)
 
-		with_branch_and_mode("main", "PR diff", function()
+		with_branch("main", function()
 			require("user.codediff").open_pr_diff_against_branch()
 		end)
 
