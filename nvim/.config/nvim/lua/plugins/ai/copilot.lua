@@ -1,6 +1,5 @@
 return {
 	"zbirenbaum/copilot.lua",
-	enabled = require("toggles").enabled("copilot"),
 	lazy = true,
 	event = "InsertEnter", -- Load only on typing
 	opts = {
