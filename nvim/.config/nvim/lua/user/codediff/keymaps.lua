@@ -73,7 +73,10 @@ local function clear_buffer_keymaps(tabpage, bufnr)
 
 	if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
 		for _, override in pairs(buffer_keymaps) do
-			restore_buffer_keymap(bufnr, override.mode, override.lhs, override.previous)
+			local current = get_buffer_keymap(bufnr, override.mode, override.lhs)
+			if current and current.callback == override.callback then
+				restore_buffer_keymap(bufnr, override.mode, override.lhs, override.previous)
+			end
 		end
 	end
 
@@ -266,12 +269,12 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 				previous = current,
 			}
 			buffer_keymaps[key] = override
-		elseif not current or current.desc ~= override.desc then
+		elseif not current or current.callback ~= override.callback then
 			override.previous = current
 		end
 
-		override.desc = desc
-		vim.keymap.set(mode, lhs, wrap_tab_action(tabpage, get_codediff_lifecycle, rhs), {
+		override.callback = wrap_tab_action(tabpage, get_codediff_lifecycle, rhs)
+		vim.keymap.set(mode, lhs, override.callback, {
 			buffer = bufnr,
 			noremap = true,
 			silent = true,
