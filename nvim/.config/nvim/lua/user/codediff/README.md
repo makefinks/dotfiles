@@ -51,6 +51,7 @@ Inside codediff tabs:
 - `<leader>gz`: toggle stage / unstage current entry
 - `<leader>gx`: discard current entry
 - `<C-q>`: close codediff
+- `t` (diff panes): toggle side-by-side / inline, remembering each layout's cursor, scroll position, and focused pane
 - `s`: stage current entry
 - `u`: unstage current entry
 - `x`: discard current entry

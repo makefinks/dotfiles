@@ -2,6 +2,7 @@ local M = {}
 
 local adapter = require("user.codediff.adapter")
 local lsp = require("user.codediff.lsp")
+local layout = require("user.codediff.layout")
 local visual = require("user.codediff.visual")
 
 local tracked_keymap_buffers = {}
@@ -225,6 +226,10 @@ function M.install_buffer_update_hook(get_codediff_lifecycle, deps)
 		local ok = original_update_buffers(tabpage, original_bufnr, modified_bufnr)
 		if ok then
 			M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
+			-- Upstream rebuilds its mappings after updating buffers.
+			vim.schedule(function()
+				M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
+			end)
 		else
 			prune_inactive_buffers(tabpage, get_codediff_lifecycle)
 		end
@@ -320,6 +325,11 @@ function M.set_tab_keymaps(tabpage, get_codediff_lifecycle, deps)
 	end, "Commit staged changes")
 
 	local original_bufnr, modified_bufnr = lifecycle.get_buffers(tabpage)
+	for _, bufnr in ipairs({ original_bufnr, modified_bufnr }) do
+		set_buffer_keymap(bufnr, "t", function()
+			layout.toggle(get_codediff_lifecycle, tabpage)
+		end, "Toggle diff layout preserving position")
+	end
 	if session.mode == "explorer" then
 		local navigation = adapter.navigation(nil, { "next_hunk", "prev_hunk" }, {
 			notify = false,

@@ -203,6 +203,9 @@ function M.setup()
 			local tabpage = args.data and args.data.tabpage or vim.api.nvim_get_current_tabpage()
 			modules.view.ensure_explorer_window_state(get_codediff_lifecycle, tabpage)
 			modules.keymaps.set_tab_keymaps(tabpage, get_codediff_lifecycle, keymap_deps)
+			vim.schedule(function()
+				modules.keymaps.set_tab_keymaps(tabpage, get_codediff_lifecycle, keymap_deps)
+			end)
 		end,
 	})
 
@@ -279,7 +282,7 @@ function M.setup()
 				discard_hunk = false,
 				hunk_textobject = "ih",
 				align_move = "gm",
-				toggle_layout = "t",
+				toggle_layout = false,
 				show_help = "g?",
 			},
 			explorer = {
