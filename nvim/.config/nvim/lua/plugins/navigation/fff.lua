@@ -68,7 +68,6 @@ end
 
 return {
 	"dmtrKovalenko/fff.nvim",
-	enabled = require("toggles").enabled("fff"),
 	cmd = {
 		"FFFFind",
 		"FFFScan",

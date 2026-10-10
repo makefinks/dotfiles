@@ -5,7 +5,7 @@
 - This is a personal dotfiles repository.
 - The main application code is the Neovim configuration under `nvim/.config/nvim`.
 - `scripts/check.sh` is the repository validation entrypoint.
-- `setup.sh` installs dependencies and stows the `zsh`, `nvim`, `tmux`, and `ghostty` packages.
+- `setup.sh` installs dependencies and stows the `zsh`, `nvim`, and `ghostty` packages; `tmux/` is not managed by the script.
 - `vimium-c/` contains browser configuration and is not managed by `setup.sh`.
 
 ## Repository Layout
@@ -34,9 +34,11 @@
 ## Bootstrap And Plugin Commands
 
 - Install or update the dotfiles: `./setup.sh`
+- WSL uses the script's Linux package-manager branch (apt-get on Ubuntu/Debian).
 - Install/sync Neovim plugins: `nvim --headless "+Lazy! sync" +qa`
 - Run Neovim health checks: `nvim --headless "+checkhealth" +qa`
 - The Neovim config targets Neovim `>= 0.12.0` and AstroNvim v6.
+- Verify the installed Neovim version: `setup.sh` uses system packages, which may be older than the required minimum.
 - There is no Makefile, package manifest, or general application build pipeline.
 
 ## Validation Commands
