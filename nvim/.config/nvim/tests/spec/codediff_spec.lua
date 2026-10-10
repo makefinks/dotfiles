@@ -874,7 +874,7 @@ describe("local CodeDiff workflow", function()
 		assert.is_true(h.line_has_review_mark(explorer, beta_line))
 	end)
 
-	it("keeps reviewed background off the selected explorer row", function()
+	it("keeps Git status in place and reviewed background off the selected explorer row", function()
 		repo = create_two_modified_files_repo()
 		local _, _, explorer = h.open_status_explorer(repo, "alpha.lua", { hide_untracked = true })
 
@@ -903,8 +903,14 @@ describe("local CodeDiff workflow", function()
 			local marks = vim.api.nvim_buf_get_extmarks(explorer.bufnr, namespace, 0, -1, { details = true })
 			for _, mark in ipairs(marks) do
 				local details = mark[4]
-				if mark[2] == line - 1 and details and details.line_hl_group == "UserCodeDiffReviewed" then
-					return true
+				if mark[2] == line - 1 and details then
+					assert.equals(0, mark[3])
+					assert.equals("overlay", details.virt_text_pos)
+					assert.equals("R ", details.virt_text[1][1])
+					local text = vim.api.nvim_buf_get_lines(explorer.bufnr, line - 1, line, false)[1]
+					assert.matches("^  ", text)
+					assert.matches("M%s*$", text)
+					return details.line_hl_group == "UserCodeDiffReviewed"
 				end
 			end
 

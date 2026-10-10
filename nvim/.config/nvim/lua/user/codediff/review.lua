@@ -216,7 +216,8 @@ function M.render(explorer)
 				end_col = #line_text,
 				priority = 10000,
 				virt_text = { { "R ", reviewed_active_marker_hl } },
-				virt_text_pos = "inline",
+				-- Use the existing indent so the right-aligned Git status is not shifted off-screen.
+				virt_text_pos = "overlay",
 			}
 
 			if not is_selected then
