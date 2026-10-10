@@ -1,5 +1,7 @@
 zsh/.local/
 ai/
+/pi/
+/tmux/
 .DS_Store
 .ruff_cache/
 nvim/.config/nvim/lua/local.lua

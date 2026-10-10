@@ -1,23 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PKGS=("nvim" "tmux" "ghostty" "zsh" "pi")
+PKGS=("nvim" "ghostty" "zsh")
 MANAGED_PATHS=(
 	".config/ghostty"
 	".config/nvim"
 	".config/zsh"
-	".pi/settings.json"
-	".pi/agent/settings.json"
-	".pi/agent/mcp.json"
-	".pi/agent/themes/dark-blue-code.json"
-	".pi/agent/keybindings.json"
-	".pi/agent/extensions/leader-hotkeys.ts"
-	".pi/agent/extensions/hide-input-bottom-border.ts"
-	".pi/agent/extensions/keep-last-model.ts"
-	".pi/agent/extensions/single-line-footer.ts"
-	".pi/agent/extensions/quotas.json"
-	".pi/agent/extensions/pi-tool-display/config.json"
-	".tmux.conf"
 	".zshrc.oh-my-zsh"
 )
 TARGET="$HOME"
@@ -118,29 +106,8 @@ ensure_zshrc_sources_dotfiles() {
 	fi
 }
 
-install_pi_packages() {
-	if ! command -v pi >/dev/null 2>&1; then
-		echo "Pi is not installed; skipping configured Pi packages."
-		return
-	fi
-
-	local settings_file="$DOTFILES_DIR/pi/.pi/agent/settings.json"
-	while IFS= read -r package; do
-		[[ -n "$package" ]] || continue
-		[[ $VERBOSE == 1 ]] && echo "Installing Pi package $package..."
-		run pi install "$package"
-	done < <(node -e '
-const fs = require("fs");
-const settings = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-for (const package of settings.packages ?? []) {
-	const source = typeof package === "string" ? package : package?.source;
-	if (typeof source === "string") console.log(source);
-}
-' "$settings_file")
-}
-
 # Install dependencies
-step "1/5" "System dependencies"
+step "1/4" "System dependencies"
 if [[ "$OSTYPE" == "darwin"* ]]; then
 	if ! command -v brew &>/dev/null; then
 		echo "Installing Homebrew..."
@@ -148,7 +115,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
 	fi
 
 	echo "Installing dependencies via Homebrew..."
-	run brew install stow neovim tmux zsh git curl node python rust fd ripgrep fzf imagemagick shfmt shellcheck
+	run brew install stow neovim zsh git curl node python rust fd ripgrep fzf imagemagick shfmt shellcheck
 
 	echo "Installing neovim node client..."
 	# shellcheck disable=SC2086
@@ -157,7 +124,7 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
 	if command -v apt-get &>/dev/null; then
 		echo "Installing dependencies via apt..."
 		run sudo apt-get update
-		run sudo apt-get install -y stow neovim tmux zsh git curl nodejs python3 rustc cargo fd-find ripgrep fzf imagemagick shfmt shellcheck
+		run sudo apt-get install -y stow neovim zsh git curl nodejs python3 rustc cargo fd-find ripgrep fzf imagemagick shfmt shellcheck
 
 		if ! command -v npm &>/dev/null; then
 			run sudo apt-get install -y npm
@@ -172,14 +139,14 @@ elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
 		run sudo npm install -g ${NPM_Q} neovim
 	elif command -v dnf &>/dev/null; then
 		echo "Installing dependencies via dnf..."
-		run sudo dnf install -y stow neovim tmux zsh git curl nodejs python3 rust cargo fd-find ripgrep fzf ImageMagick shfmt ShellCheck
+		run sudo dnf install -y stow neovim zsh git curl nodejs python3 rust cargo fd-find ripgrep fzf ImageMagick shfmt ShellCheck
 
 		echo "Installing neovim node client..."
 		# shellcheck disable=SC2086
 		run sudo npm install -g ${NPM_Q} neovim
 	elif command -v pacman &>/dev/null; then
 		echo "Installing dependencies via pacman..."
-		arch_packages=(stow neovim tmux ghostty zsh git curl nodejs npm python rust fd ripgrep fzf imagemagick shfmt shellcheck)
+		arch_packages=(stow neovim ghostty zsh git curl nodejs npm python rust fd ripgrep fzf imagemagick shfmt shellcheck)
 		if command -v omarchy &>/dev/null; then
 			run omarchy pkg add "${arch_packages[@]}"
 		else
@@ -198,13 +165,11 @@ else
 	exit 1
 fi
 
-step "2/5" "Oh My Zsh and Powerlevel10k"
+step "2/4" "Oh My Zsh and Powerlevel10k"
 clone_or_update_repo "Oh My Zsh" "https://github.com/ohmyzsh/ohmyzsh.git" "$OH_MY_ZSH_DIR"
 clone_or_update_repo "Powerlevel10k" "https://github.com/romkatv/powerlevel10k.git" "$POWERLEVEL10K_DIR"
 
-step "3/5" "Backing up and linking dotfiles"
-# Keep Pi's generated auth, sessions, and package files outside the Stow package.
-mkdir -p "$TARGET/.pi/agent/extensions" "$TARGET/.pi/agent/themes"
+step "3/4" "Backing up and linking dotfiles"
 
 # Back up only the application configs owned by this repository. Walking each
 # Stow package also visits .config itself, which would move the entire directory.
@@ -223,9 +188,7 @@ echo "Backed up $BACKED_UP file(s) to $BACKUP."
 # Create (or refresh) symlinks
 stow ${STOW_Q} -R --dir="$DOTFILES_DIR" --target="$TARGET" "${PKGS[@]}"
 
-step "4/5" "Pi extensions"
-install_pi_packages
-step "5/5" "Shell integration"
+step "4/4" "Shell integration"
 ensure_zshrc_sources_dotfiles
 
 printf '%sDone.%s Linked %d packages, backed up %d file(s): %s\n' "$C_BOLD" "$C_RESET" "${#PKGS[@]}" "$BACKED_UP" "$BACKUP"
