@@ -38,6 +38,9 @@ keybind = ctrl+shift+left=unbind
 keybind = ctrl+shift+right=unbind
 keybind = ctrl+b>t=goto_split:next
 keybind = ctrl+b>z=toggle_split_zoom
+# Toggle zoom, then move focus to the next split.
+keybind = super+shift+enter=toggle_split_zoom
+keybind = chain=goto_split:next
 keybind = ctrl+b>0=goto_tab:1
 keybind = ctrl+b>1=goto_tab:2
 keybind = ctrl+b>2=goto_tab:3
