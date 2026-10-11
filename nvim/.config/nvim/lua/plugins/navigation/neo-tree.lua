@@ -77,6 +77,8 @@ return {
 		filesystem = {
 			window = {
 				mappings = {
+					["S"] = "expand_all_subnodes",
+					["C"] = "close_all_subnodes",
 					["/"] = "fuzzy_finder",
 					["ff"] = false,
 					["fw"] = false,
