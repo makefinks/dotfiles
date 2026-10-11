@@ -59,6 +59,17 @@ end
 
 return {
 	"nvim-neo-tree/neo-tree.nvim",
+	config = function(_, opts)
+		require("user.neo_tree_search").setup()
+		opts.event_handlers = opts.event_handlers or {}
+		table.insert(opts.event_handlers, {
+			event = "after_render",
+			handler = function(state)
+				require("user.neo_tree_search").highlight(state)
+			end,
+		})
+		require("neo-tree").setup(opts)
+	end,
 	opts = {
 		clipboard = {
 			sync = "universal",
