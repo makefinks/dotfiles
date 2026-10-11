@@ -67,7 +67,7 @@ return {
 			width = 50,
 			mappings = {
 				["<C-CR>"] = "open_vsplit",
-				["s"] = "none",
+				["s"] = "toggle_node",
 			},
 			mapping_options = {
 				noremap = true,
